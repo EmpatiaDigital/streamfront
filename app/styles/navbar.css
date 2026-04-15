@@ -1,0 +1,451 @@
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 40px;
+  background: rgba(13, 13, 26, 0.95);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-logo-icon {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-brand {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+}
+
+.nav-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.nav-link:hover { color: #fff; }
+
+.nav-cta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  color: #a855f7;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+}
+
+.btn-ghost:hover { border-color: #a855f7; }
+
+.btn-upload {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border: none;
+  color: white;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.btn-upload:hover { opacity: 0.88; }
+
+/* ─── HAMBURGER (solo visible en mobile) ─── */
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 7px;
+  flex-shrink: 0;
+}
+
+.nav-hamburger span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  transition: all 0.25s ease;
+}
+
+/* Hamburger animado cuando está abierto */
+.nav-hamburger.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.nav-hamburger.open span:nth-child(2) {
+  opacity: 0;
+}
+.nav-hamburger.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ─── MENÚ MOBILE (drawer) ─── */
+.nav-mobile-menu {
+  display: none;
+  flex-direction: column;
+  background: rgba(13, 13, 26, 0.98);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+  backdrop-filter: blur(12px);
+  padding: 8px 20px 20px;
+  gap: 4px;
+}
+
+.nav-mobile-menu.open {
+  display: flex;
+}
+
+.nav-mobile-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 12px 4px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: color 0.2s;
+}
+
+.nav-mobile-link:last-of-type {
+  border-bottom: none;
+}
+
+.nav-mobile-link:hover { color: #fff; }
+
+.nav-mobile-cta {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.nav-mobile-cta .btn-ghost,
+.nav-mobile-cta .btn-upload {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ─── IMÁGENES RESPONSIVE (global) ─── */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Card thumbnails */
+.card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 14px 20px;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .nav-cta {
+    display: none;
+  }
+
+  .nav-hamburger {
+    display: flex;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-brand {
+    font-size: 17px;
+  }
+
+  .nav-logo-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+}
+.nav-logo-img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  border-radius: 50px;
+  margin-right: 8px;
+}
+
+/* ─── USER DROPDOWN ─── */
+.nav-user-wrapper {
+  position: relative;
+}
+
+.nav-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 5px 12px 5px 6px;
+  cursor: pointer;
+  color: #fff;
+  transition: border-color 0.18s;
+}
+
+.nav-user-btn:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.nav-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.nav-avatar.large {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+}
+
+.nav-username {
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-chevron {
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.2s;
+}
+
+.nav-chevron.open {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 200px;
+  z-index: 100;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.nav-dropdown-info {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-dropdown-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.nav-dropdown-email {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.nav-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 4px 0;
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: left;
+}
+
+.nav-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.nav-dropdown-item.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+/* ─── MOBILE USER ─── */
+.nav-mobile-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  margin-bottom: 8px;
+}
+
+.nav-mobile-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.nav-mobile-email {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+}
+
+.btn-ghost.danger {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-ghost.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+@media (max-width: 768px) {
+
+  /* CTA container más compacto */
+  .nav-mobile-cta {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  /* Botones más chicos y prolijos */
+  .nav-mobile-cta .btn-ghost,
+  .nav-mobile-cta .btn-upload,
+  .nav-mobile-cta .btn-go-live {
+    padding: 10px 12px;
+    font-size: 12px;
+    border-radius: 10px;
+    height: 38px;
+  }
+
+  /* Íconos más chicos */
+  .nav-mobile-cta svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Botón cerrar sesión más “ligero” */
+  .btn-ghost.danger {
+    font-size: 12px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    opacity: 0.9;
+  }
+
+  /* Hover más suave (mobile feel) */
+  .btn-ghost.danger:active {
+    background: rgba(239, 68, 68, 0.15);
+    transform: scale(0.98);
+  }
+
+  /* Botón iniciar vivo más fino */
+  .btn-go-live {
+    font-size: 12px;
+    padding: 9px 12px;
+    height: 38px;
+  }
+
+  .btn-go-live-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  /* Upload más compacto */
+  .btn-upload {
+    font-size: 12px;
+    padding: 9px 12px;
+    height: 38px;
+  }
+}
+.nav-mobile-cta {
+  position: sticky;
+  bottom: 0;
+  background: rgba(13, 13, 26, 0.98);
+  padding-bottom: 12px;
+}

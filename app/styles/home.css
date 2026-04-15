@@ -1,0 +1,387 @@
+/* ============================================
+   home.css — COMPLETO
+   ============================================ */
+
+.home-wrapper {
+  background: #0d0d1a;
+  min-height: 100vh;
+  color: #fff;
+}
+
+/* ─── CATEGORIES ─── */
+.categories {
+  padding: 16px 40px 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.categories::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.18s;
+  font-family: inherit;
+}
+
+.cat-btn.active {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  border-color: transparent;
+}
+
+.cat-btn:not(.active):hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #fff;
+}
+
+/* ─── SORT ─── */
+.feed-sort {
+  display: flex;
+  gap: 8px;
+  padding: 12px 40px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.feed-sort::-webkit-scrollbar {
+  display: none;
+}
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.sort-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.sort-btn.active {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.5);
+  color: #a78bfa;
+}
+
+/* ─── FEED ─── */
+.feed {
+  padding: 20px 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* ─── CARD ─── */
+.card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.card:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+/* ─── THUMBNAIL ─── */
+.card-thumb {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.card-thumb.purple { background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15)); }
+.card-thumb.pink   { background: linear-gradient(135deg, rgba(236,72,153,0.3), rgba(168,85,247,0.15)); }
+.card-thumb.amber  { background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(239,68,68,0.15)); }
+.card-thumb.blue   { background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.15)); }
+.card-thumb.green  { background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(59,130,246,0.15)); }
+.card-thumb.coral  { background: linear-gradient(135deg, rgba(239,68,68,0.3), rgba(245,158,11,0.15)); }
+
+.card-thumb img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  top: 0;
+  left: 0;
+}
+
+.play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* ─── BADGES ─── */
+.live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(61, 232, 138, 0.9);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.live-dot {
+  width: 5px;
+  height: 5px;
+  background: white;
+  border-radius: 50%;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.viewers {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── CARD BODY ─── */
+.card-body { padding: 14px 16px; }
+
+.card-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.avatar-purple { background: rgba(168, 85,  247, 0.2); color: #a855f7; }
+.avatar-pink   { background: rgba(236, 72,  153, 0.2); color: #ec4899; }
+.avatar-amber  { background: rgba(245, 158, 11,  0.2); color: #f59e0b; }
+.avatar-blue   { background: rgba(59,  130, 246, 0.2); color: #3b82f6; }
+.avatar-green  { background: rgba(16,  185, 129, 0.2); color: #10b981; }
+.avatar-coral  { background: rgba(239, 68,  68,  0.2); color: #ef4444; }
+
+.card-name  { font-size: 13px; font-weight: 600; }
+.card-cat   { font-size: 11px; color: #a855f7; font-weight: 600; }
+.card-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.card-desc  { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.5; margin-bottom: 10px; }
+
+.card-stats { display: flex; gap: 14px; }
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ─── EMPTY STATE ─── */
+.feed-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 80px 20px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+}
+
+.feed-empty p    { margin: 0; font-size: 16px; font-weight: 500; }
+.feed-empty span { font-size: 13px; color: rgba(255, 255, 255, 0.2); }
+
+/* ─── SKELETON ─── */
+.card-skeleton .card-thumb-skeleton {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: rgba(255, 255, 255, 0.06);
+  animation: shimmer 1.5s infinite;
+}
+
+.skel-line {
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: shimmer 1.5s infinite;
+  margin-bottom: 8px;
+  width: 70%;
+}
+
+.skel-line.wide   { width: 90%; }
+.skel-line.narrow { width: 40%; }
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+/* ─── LOAD MORE ─── */
+.feed-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.load-more-btn {
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: #a78bfa;
+  border-radius: 24px;
+  padding: 12px 32px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.load-more-btn:hover {
+  background: rgba(124, 58, 237, 0.25);
+  transform: translateY(-1px);
+}
+
+/* ─── VIDEO MODAL ─── */
+.video-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.video-container {
+  position: relative;
+  width: 90%;
+  max-width: 900px;
+  aspect-ratio: 16 / 9;
+}
+
+.video-container video {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+.video-modal-close {
+  position: absolute;
+  top: -44px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  backdrop-filter: blur(8px);
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .categories {
+    padding: 12px 16px 0;
+  }
+
+  .feed-sort {
+    padding: 10px 16px 0;
+  }
+
+  .feed {
+    padding: 16px;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .video-container {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .feed {
+    padding: 12px;
+    gap: 12px;
+  }
+}

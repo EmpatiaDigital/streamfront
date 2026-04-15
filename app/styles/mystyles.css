@@ -1,0 +1,633 @@
+/* ═══════════════════════════════════════════════════════════════════
+   THEME 5 — MYSTYLES (Custom user colors)
+   Layout: split asymmetric panel — avatar floats left as sticky panel
+   Font: Outfit + JetBrains Mono for details
+   Structure adapts to user-defined CSS variables
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+.profile-wrapper.mystyles {
+  --bg:          var(--my-bg, #0d0d1a);
+  --card-bg:     color-mix(in srgb, var(--my-accent, #a855f7) 6%, transparent);
+  --card-border: color-mix(in srgb, var(--my-accent, #a855f7) 18%, transparent);
+  --accent:      var(--my-accent, #a855f7);
+  --accent2:     var(--my-accent2, #ec4899);
+  --text:        var(--my-text, #ffffff);
+  --text-muted:  color-mix(in srgb, var(--my-text, #ffffff) 45%, transparent);
+  --btn-bg:      linear-gradient(135deg, var(--my-accent, #a855f7), var(--my-accent2, #ec4899));
+  --radius:      14px;
+
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--text);
+  position: relative;
+}
+
+/* gradient mesh background */
+.profile-wrapper.mystyles::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 20%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, color-mix(in srgb, var(--accent2) 8%, transparent) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── BANNER: wide with rounded corners + gradient overlay ── */
+.profile-wrapper.mystyles .profile-banner {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  display: block;
+  position: relative;
+  z-index: 1;
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  filter: brightness(0.6) saturate(1.3);
+}
+
+/* ── HEADER: two-column sticky sidebar layout ── */
+.profile-wrapper.mystyles .profile-header {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  max-width: 1100px;
+  margin: -80px auto 0;
+  padding: 0 24px;
+  position: relative;
+  z-index: 2;
+  gap: 32px;
+  align-items: start;
+}
+
+/* left panel */
+.profile-wrapper.mystyles .profile-avatar-row {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px);
+}
+
+.profile-wrapper.mystyles .profile-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 15%, transparent);
+  object-fit: cover;
+  display: block;
+}
+
+.profile-wrapper.mystyles .profile-header-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+/* right panel — info */
+.profile-wrapper.mystyles .profile-info {
+  padding: 24px 0 0;
+}
+
+.profile-wrapper.mystyles .profile-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+
+/* accent gradient on name */
+.profile-wrapper.mystyles .profile-name {
+  background: linear-gradient(90deg, var(--text) 30%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.profile-wrapper.mystyles .profile-username {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--accent2);
+  margin: 0 0 16px;
+  letter-spacing: 0.04em;
+}
+
+.profile-wrapper.mystyles .profile-bio {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin: 0 0 20px;
+  max-width: 540px;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.profile-wrapper.mystyles .profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.profile-wrapper.mystyles .profile-meta-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+}
+
+/* ── STATS: card badges ── */
+.profile-wrapper.mystyles .profile-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-wrapper.mystyles .profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.profile-wrapper.mystyles .profile-stat-num {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.profile-wrapper.mystyles .profile-stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ── BUTTONS ── */
+.profile-wrapper.mystyles .btn-subscribe {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none;
+  color: white;
+  padding: 11px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.profile-wrapper.mystyles .btn-subscribe:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.profile-wrapper.mystyles .btn-subscribe.subscribed {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.profile-wrapper.mystyles .btn-contact {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.profile-wrapper.mystyles .btn-contact:hover {
+  border-color: var(--accent2);
+  color: var(--accent2);
+}
+
+.profile-wrapper.mystyles .btn-settings {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.profile-wrapper.mystyles .btn-settings:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── TABS: gradient underline ── */
+.profile-wrapper.mystyles .profile-tabs {
+  display: flex;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 0;
+  gap: 4px;
+  position: relative;
+  z-index: 2;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.profile-wrapper.mystyles .profile-tab {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 12px 20px;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  transition: all 0.2s;
+}
+.profile-wrapper.mystyles .profile-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 8px; right: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 2px;
+  transform: scaleX(0);
+  transition: transform 0.25s;
+}
+.profile-wrapper.mystyles .profile-tab.active {
+  color: var(--text);
+  background: var(--card-bg);
+}
+.profile-wrapper.mystyles .profile-tab.active::after {
+  transform: scaleX(1);
+}
+
+/* ── CONTENT ── */
+.profile-wrapper.mystyles .profile-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  position: relative;
+  z-index: 2;
+}
+
+.profile-wrapper.mystyles .profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* ── CARDS ── */
+.profile-wrapper.mystyles .profile-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.25s, box-shadow 0.25s;
+  backdrop-filter: blur(8px);
+}
+.profile-wrapper.mystyles .profile-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.profile-wrapper.mystyles .profile-card-thumb {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s;
+}
+.profile-wrapper.mystyles .profile-card:hover .profile-card-thumb {
+  transform: scale(1.04);
+}
+
+/* gradient overlay on thumb */
+.profile-wrapper.mystyles .profile-card-thumb + .profile-card-body::before {
+  content: '';
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  margin: -0px -0px 0;
+}
+
+.profile-wrapper.mystyles .profile-card-body {
+  padding: 16px;
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(90deg, var(--accent), var(--accent2)) 1;
+}
+
+.profile-wrapper.mystyles .profile-card-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.profile-wrapper.mystyles .profile-card-desc {
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+
+.profile-wrapper.mystyles .profile-card-actions { display: flex; gap: 8px; }
+
+.profile-wrapper.mystyles .btn-like {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+.profile-wrapper.mystyles .btn-like:hover,
+.profile-wrapper.mystyles .btn-like.liked {
+  border-color: var(--accent2);
+  color: var(--accent2);
+}
+
+.profile-wrapper.mystyles .btn-delete {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: rgba(239,68,68,0.05);
+  border: 1px solid rgba(239,68,68,0.1);
+  color: rgba(239,68,68,0.5);
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+.profile-wrapper.mystyles .btn-delete:hover {
+  background: rgba(239,68,68,0.1);
+  border-color: rgba(239,68,68,0.3);
+  color: rgba(239,68,68,0.8);
+}
+
+/* ── SETTINGS MODAL ── */
+.profile-wrapper.mystyles .settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(16px);
+}
+
+.profile-wrapper.mystyles .settings-modal {
+  background: color-mix(in srgb, var(--bg) 95%, white);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  width: 90%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 32px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px var(--card-border);
+}
+
+.profile-wrapper.mystyles .settings-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  background: linear-gradient(90deg, var(--text), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.profile-wrapper.mystyles .settings-close {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  transition: all 0.2s;
+  -webkit-text-fill-color: initial;
+  color: var(--text-muted);
+}
+.profile-wrapper.mystyles .settings-close:hover {
+  border-color: rgba(239,68,68,0.4);
+  color: rgba(239,68,68,0.8);
+}
+
+.profile-wrapper.mystyles .settings-section {
+  margin-bottom: 20px;
+  padding: 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+}
+
+.profile-wrapper.mystyles .settings-section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 16px;
+}
+
+.profile-wrapper.mystyles .settings-field { margin-bottom: 14px; }
+
+.profile-wrapper.mystyles .settings-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.profile-wrapper.mystyles .settings-input {
+  width: 100%;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 13px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.profile-wrapper.mystyles .settings-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.profile-wrapper.mystyles .settings-textarea {
+  width: 100%;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 13px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  min-height: 80px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.profile-wrapper.mystyles .settings-textarea:focus { border-color: var(--accent); }
+
+.profile-wrapper.mystyles .settings-upload-row {
+  display: flex; align-items: center; gap: 14px;
+}
+.profile-wrapper.mystyles .settings-upload-preview {
+  width: 52px; height: 52px; border-radius: 12px;
+  border: 2px solid var(--card-border); object-fit: cover;
+}
+.profile-wrapper.mystyles .settings-upload-btn {
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+  background: var(--card-bg); border: 1px solid var(--card-border);
+  color: var(--text-muted); padding: 8px 16px; border-radius: 10px;
+  cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;
+}
+.profile-wrapper.mystyles .settings-upload-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+}
+
+.profile-wrapper.mystyles .settings-input-eye { position: relative; }
+.profile-wrapper.mystyles .settings-eye-btn {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex;
+}
+
+.profile-wrapper.mystyles .settings-save {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none;
+  color: white;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px; font-weight: 700;
+  padding: 13px; border-radius: 12px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.profile-wrapper.mystyles .settings-save:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.profile-wrapper.mystyles .settings-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.profile-wrapper.mystyles .theme-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px;
+}
+.profile-wrapper.mystyles .theme-btn {
+  font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600;
+  padding: 10px; border-radius: 10px; border: 1px solid var(--card-border);
+  color: var(--text-muted); background: rgba(255,255,255,0.03);
+  cursor: pointer; transition: all 0.2s;
+}
+.profile-wrapper.mystyles .theme-btn.active {
+  border-color: var(--accent); color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.profile-wrapper.mystyles .color-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.profile-wrapper.mystyles .color-field { display: flex; flex-direction: column; gap: 6px; }
+.profile-wrapper.mystyles .color-field label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.profile-wrapper.mystyles .color-input {
+  width: 100%; height: 36px; border-radius: 8px;
+  border: 1px solid var(--card-border); cursor: pointer; padding: 2px;
+  background: rgba(0,0,0,0.3);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .profile-wrapper.mystyles .profile-header {
+    grid-template-columns: 1fr;
+    margin-top: -40px;
+    padding: 0 16px;
+  }
+  .profile-wrapper.mystyles .profile-avatar-row {
+    flex-direction: row;
+    align-items: center;
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .profile-wrapper.mystyles .profile-avatar { width: 72px; height: 72px; }
+  .profile-wrapper.mystyles .profile-header-actions { flex-direction: row; flex-wrap: wrap; }
+  .profile-wrapper.mystyles .profile-info { padding: 16px 0; }
+  .profile-wrapper.mystyles .profile-name { font-size: 30px; }
+  .profile-wrapper.mystyles .profile-tabs { padding: 16px 16px 0; overflow-x: auto; }
+  .profile-wrapper.mystyles .profile-grid {
+    grid-template-columns: repeat(2, 1fr); gap: 10px;
+  }
+}

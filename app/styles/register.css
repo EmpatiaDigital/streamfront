@@ -1,0 +1,329 @@
+/* ─── REGISTER PAGE ─── */
+
+.register-wrapper {
+  background: #0d0d1a;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient glow — slightly warmer tint to differentiate from login */
+.register-wrapper::before {
+  content: "";
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 500px;
+  background: radial-gradient(ellipse at center, rgba(168, 85, 247, 0.10) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.register-wrapper::after {
+  content: "";
+  position: absolute;
+  bottom: -80px;
+  right: 10%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(ellipse at center, rgba(236, 72, 153, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ─── CARD ─── */
+.register-card {
+  width: 100%;
+  max-width: 460px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 40px 36px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── HEADER ─── */
+.register-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(236, 72, 153, 0.1);
+  border: 1px solid rgba(236, 72, 153, 0.28);
+  color: #f472b6;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 18px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.register-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 6px;
+  line-height: 1.1;
+}
+
+.register-title span {
+  background: linear-gradient(90deg, #ec4899, #a855f7, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.register-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+
+/* ─── FORM ─── */
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.register-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.register-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.register-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 13px 16px;
+  outline: none;
+  transition: border-color 0.18s, background 0.18s;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.register-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.register-input:focus {
+  border-color: rgba(236, 72, 153, 0.5);
+  background: rgba(236, 72, 153, 0.05);
+}
+
+/* ─── ROW (e.g. dos campos en paralelo si se necesita) ─── */
+.register-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ─── HINT / HELPER TEXT ─── */
+.register-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.4;
+  margin-top: -2px;
+}
+
+/* ─── TERMS ─── */
+.register-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.register-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  margin-top: 1px;
+  transition: border-color 0.18s, background 0.18s;
+  position: relative;
+}
+
+.register-checkbox:checked {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border-color: transparent;
+}
+
+.register-checkbox:checked::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: white;
+  font-weight: 800;
+}
+
+.register-terms-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.5;
+}
+
+.register-terms-text a {
+  color: #a855f7;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.18s;
+}
+
+.register-terms-text a:hover {
+  color: #c084fc;
+}
+
+/* ─── SUBMIT ─── */
+.register-btn {
+  background: linear-gradient(135deg, #9d174d, #ec4899, #a855f7);
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 6px;
+  transition: opacity 0.2s, transform 0.15s;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+}
+
+.register-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.register-btn:active {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ─── DIVIDER ─── */
+.register-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.register-divider::before,
+.register-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.register-divider span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* ─── FOOTER LINK ─── */
+.register-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.register-footer a {
+  color: #ec4899;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.18s;
+}
+
+.register-footer a:hover {
+  color: #f472b6;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 600px) {
+  .register-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .register-card {
+    padding: 28px 20px;
+    border-radius: 16px;
+  }
+
+  .register-title {
+    font-size: 24px;
+  }
+
+  .register-btn {
+    font-size: 14px;
+    padding: 13px;
+  }
+}
+
+/* ─── EYE TOGGLE ─── */
+.input-eye-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-eye-wrapper .login-input,
+.input-eye-wrapper .register-input {
+  padding-right: 44px;
+  width: 100%;
+}
+
+.eye-btn {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.18s;
+}
+
+.eye-btn:hover {
+  color: rgba(255, 255, 255, 0.75);
+}

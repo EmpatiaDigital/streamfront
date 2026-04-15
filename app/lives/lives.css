@@ -1,0 +1,615 @@
+/* app/go-live/go-live.css */
+
+.golive-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d0d14;
+  padding: 40px 16px;
+  position: relative;
+  overflow: hidden;
+  font-family: "DM Sans", sans-serif;
+}
+
+/* Ambient red glow background */
+.golive-glow {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.12) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.08); }
+}
+
+/* Card */
+.golive-card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 36px 32px 32px;
+  backdrop-filter: blur(16px);
+  animation: card-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.golive-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.golive-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 14px;
+}
+
+.golive-icon {
+  color: #ef4444;
+  position: relative;
+  z-index: 1;
+  animation: icon-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes icon-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.golive-icon-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(239, 68, 68, 0.35);
+  animation: ring-scale 1.6s ease-in-out infinite;
+}
+
+@keyframes ring-scale {
+  0%, 100% { transform: scale(1);    opacity: 0.6; }
+  50%       { transform: scale(1.18); opacity: 0.2; }
+}
+
+.golive-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 6px;
+  letter-spacing: -0.4px;
+}
+
+.golive-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.38);
+  margin: 0;
+}
+
+/* Preview strip */
+.golive-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+}
+
+.golive-preview-cam {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.golive-preview-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.golive-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 20px;
+  padding: 3px 8px;
+}
+
+/* Form */
+.golive-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.golive-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.golive-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.golive-label span {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.golive-input,
+.golive-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  color: #e2e8f0;
+  font-family: inherit;
+  resize: none;
+  transition: border-color 0.15s;
+  outline: none;
+}
+
+.golive-input::placeholder,
+.golive-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.golive-input:focus,
+.golive-textarea:focus {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.golive-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
+/* Select custom */
+.golive-select-wrap {
+  position: relative;
+}
+
+.golive-select {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.golive-select.open,
+.golive-select:hover {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.golive-chevron {
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.golive-chevron.open {
+  transform: rotate(180deg);
+}
+
+.golive-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 50;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  animation: dd-in 0.15s ease both;
+}
+
+@keyframes dd-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.golive-option {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.65);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.golive-option:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+.golive-option.selected {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* Error */
+.golive-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+
+/* CTA button */
+.golive-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.12s;
+  margin-top: 4px;
+  letter-spacing: -0.2px;
+}
+
+.golive-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.golive-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.golive-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.golive-btn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  animation: icon-blink 1.4s ease-in-out infinite;
+}
+
+.golive-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 520px) {
+  .golive-card {
+    padding: 28px 20px 24px;
+  }
+}
+
+/* ── Agregar al final de tu lives.css ───────────────────────────────────── */
+
+.golive-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0a0a0f;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.golive-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1); /* espejo, como selfie */
+}
+
+.golive-video--off {
+  opacity: 0;
+}
+
+.golive-video-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #666;
+  font-size: 13px;
+}
+
+/* Badges convertidos en botones */
+.golive-badge--btn {
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.golive-badge--btn:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.golive-badge--btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.golive-badge--off {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Error de permisos */
+.golive-media-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  color: #ef4444;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.golive-retry-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: transparent;
+  color: #ef4444;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.golive-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+
+/* ── VIDEO WRAP MEJORADO ───────────────────────────────────── */
+
+.golive-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0a0a0f;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Video */
+.golive-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  z-index: 1;
+}
+
+.golive-video--off {
+  opacity: 0;
+}
+
+/* Overlay (cuando no hay cámara) */
+.golive-video-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #666;
+  font-size: 13px;
+  background: rgba(10, 10, 15, 0.7);
+}
+
+/* ── CONTROLES ABAJO (NUEVO 🔥) ───────────────────────────── */
+
+.golive-controls {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.7),
+    rgba(0, 0, 0, 0.3),
+    transparent
+  );
+}
+
+/* Botones tipo cápsula */
+.golive-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.5);
+  color: #e5e7eb;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(6px);
+}
+
+/* Hover */
+.golive-control-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Estado apagado (mic/cam off) */
+.golive-control-btn.off {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+/* Disabled */
+.golive-control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── BADGES ARRIBA (MÁS LIMPIO) ───────────────────────────── */
+
+.golive-preview {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.golive-preview-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* badges como info (no botones principales) */
+.golive-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+/* ── ERROR MEDIA ─────────────────────────────────────────── */
+
+.golive-media-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  color: #ef4444;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* Retry */
+.golive-retry-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: transparent;
+  color: #ef4444;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.golive-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* ── MOBILE EXTRA FINO ───────────────────────────────────── */
+
+@media (max-width: 520px) {
+
+  .golive-video-wrap {
+    border-radius: 10px;
+  }
+
+  .golive-controls {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .golive-control-btn {
+    font-size: 10px;
+    padding: 5px 8px;
+  }
+}
