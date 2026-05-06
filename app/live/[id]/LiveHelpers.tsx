@@ -10,7 +10,7 @@ import {
 import "./live.css";
 
 // AuthContext — username real del usuario logueado
-import { AuthContext } from "@/app/context/AuthContext";
+import { AuthContext } from "../../context/AuthContext";
 
 
 // Helpers / sub-componentes
