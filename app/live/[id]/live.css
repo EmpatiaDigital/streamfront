@@ -575,3 +575,713 @@
 
   .live-stream-info { display: flex; flex-direction: column; }
 }
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════
+   live.css — Estilos para la página de live streaming
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Layout raíz ───────────────────────────────────────────────── */
+.live-root {
+  display: flex;
+  height: 100dvh;
+  background: #0a0a14;
+  color: #fff;
+  font-family: "DM Sans", system-ui, sans-serif;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Estado de carga / error / finalizado ──────────────────────── */
+.live-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 100dvh;
+  background: #0a0a14;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 15px;
+}
+
+.live-ended {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100dvh;
+  background: #0a0a14;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  padding: 24px;
+}
+.live-ended h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+.live-ended p {
+  font-size: 14px;
+  margin: 0;
+}
+.live-vod {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 12px;
+  margin-top: 8px;
+}
+
+/* ── Área de video ─────────────────────────────────────────────── */
+.live-video-area {
+  flex: 1;
+  position: relative;
+  background: #05050d;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.live-video-el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+/* ── Placeholder "cámara apagada / conectando" ─────────────────── */
+.live-video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  background: #0a0a14;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 2;
+}
+.live-video-placeholder svg {
+  opacity: 0.4;
+}
+
+/* ── Stage: escenario multi-cámara ─────────────────────────────── */
+.live-stage-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 3px;
+  z-index: 1;
+}
+.live-stage-grid[data-count="1"] { grid-template-columns: 1fr; }
+.live-stage-grid[data-count="2"] { grid-template-columns: 1fr 1fr; }
+.live-stage-grid[data-count="3"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.live-stage-grid[data-count="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.live-stage-grid[data-count="5"],
+.live-stage-grid[data-count="6"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.live-stage-grid[data-count="7"],
+.live-stage-grid[data-count="8"],
+.live-stage-grid[data-count="9"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+
+.live-stage-cell {
+  position: relative;
+  background: #0d0d1a;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.live-stage-cell video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.live-stage-cell-label {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 7px;
+  border-radius: 5px;
+  pointer-events: none;
+}
+.live-stage-cell-host {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #a3e635;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 7px;
+  border-radius: 5px;
+  pointer-events: none;
+}
+.live-stage-remove-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.85);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.live-stage-cell:hover .live-stage-remove-btn {
+  opacity: 1;
+}
+
+/* ── Badges de estado (EN VIVO / PRÓXIMAMENTE) ─────────────────── */
+.live-badge-viewers {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.04em;
+  z-index: 10;
+}
+.live-rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: live-blink 1.5s infinite;
+  display: inline-block;
+}
+.live-badge-sep {
+  opacity: 0.4;
+  margin: 0 1px;
+}
+
+.live-badge-waiting {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(245, 158, 11, 0.25);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+  z-index: 10;
+}
+
+/* ── Animación de gift en video ────────────────────────────────── */
+.live-gift-anim {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -62%) scale(1);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 14px 22px;
+  text-align: center;
+  animation: giftPop 3.5s ease forwards;
+  pointer-events: none;
+  z-index: 20;
+  min-width: 160px;
+}
+.live-gift-anim-emoji {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 6px;
+}
+.live-gift-anim p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Controles del owner (mic/cam) ─────────────────────────────── */
+.live-owner-controls {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+.live-ctrl-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.live-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.live-ctrl-btn:active {
+  transform: scale(0.93);
+}
+.live-ctrl-btn.off {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+/* ── Panel de chat ─────────────────────────────────────────────── */
+.live-chat-panel {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  background: #0d0d1e;
+  overflow: hidden;
+}
+
+/* Header del chat */
+.live-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+.live-chat-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+.live-chat-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Info del stream */
+.live-stream-info {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+.live-stream-info-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+}
+.live-stream-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-stream-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+.live-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.07em;
+  flex-shrink: 0;
+}
+.live-pill-live {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.live-pill-waiting {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ── Mensajes del chat ─────────────────────────────────────────── */
+.live-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.live-chat-messages::-webkit-scrollbar {
+  width: 4px;
+}
+.live-chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.live-chat-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+  margin-top: 20px;
+}
+
+/* Burbujas de chat */
+.live-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+  gap: 2px;
+  animation: msgSlideIn 0.18s ease;
+}
+.live-msg--left {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.live-msg--right {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.live-msg-name {
+  font-size: 10px;
+  font-weight: 700;
+  margin: 0 4px;
+  letter-spacing: 0.02em;
+}
+
+.live-msg-bubble {
+  padding: 6px 11px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.live-msg--left .live-msg-bubble {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
+  border-bottom-left-radius: 4px;
+}
+.live-msg--right .live-msg-bubble {
+  background: rgba(124, 58, 237, 0.35);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+/* Insignia "propietario" en nombre */
+.live-msg-owner-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  background: rgba(163, 230, 53, 0.2);
+  color: #a3e635;
+  border: 1px solid rgba(163, 230, 53, 0.3);
+  border-radius: 4px;
+  padding: 0px 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.05em;
+}
+
+/* ── Gift picker ───────────────────────────────────────────────── */
+.live-gift-picker {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+.live-gift-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+}
+.live-gift-picker-header button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.live-gift-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.live-gift-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  color: #fff;
+}
+.live-gift-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+.live-gift-item:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.live-gift-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+.live-gift-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Input row ─────────────────────────────────────────────────── */
+.live-chat-actions {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 10px 12px;
+  flex-shrink: 0;
+}
+.live-input-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.live-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.live-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+.live-input:focus {
+  border-color: rgba(124, 58, 237, 0.5);
+}
+.live-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.live-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: none;
+  background: rgba(124, 58, 237, 0.7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.live-send-btn:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.9);
+}
+.live-send-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.live-send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.live-action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.live-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.live-action-gift.active {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: rgba(250, 204, 21, 0.35);
+  color: #fbbf24;
+}
+
+/* ── Panel escenario (stage) ───────────────────────────────────── */
+.live-stage-panel {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.live-stage-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.live-stage-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.live-stage-slots {
+  padding: 0 10px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.live-stage-slot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 5px;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.12);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  font-size: 11px;
+  font-weight: 600;
+  color: #c4b5fd;
+}
+.live-stage-slot-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a3e635;
+  flex-shrink: 0;
+}
+.live-stage-slot-remove {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.3);
+  border: none;
+  color: #f87171;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 2px;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.live-stage-slot-remove:hover {
+  background: rgba(239, 68, 68, 0.55);
+}
+.live-stage-add-row {
+  padding: 0 10px 10px;
+}
+.live-stage-invite-select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #fff;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+.live-stage-invite-select option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+/* ── Animaciones ───────────────────────────────────────────────── */
+@keyframes giftPop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  20%  { opacity: 1; transform: translate(-50%, -62%) scale(1.2); }
+  80%  { opacity: 1; transform: translate(-50%, -62%) scale(1);   }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(0.9); }
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes msgSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .live-root {
+    flex-direction: column;
+  }
+  .live-video-area {
+    flex: none;
+    height: 42dvh;
+  }
+  .live-chat-panel {
+    width: 100%;
+    flex: 1;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+}
