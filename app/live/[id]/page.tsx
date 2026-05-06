@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import "./live.css";
 
-import { AuthContext } from "../../context/AuthContext";
+import { AuthContext } from "@/app/context/AuthContext";
 
 import {
   ChatMessages,
