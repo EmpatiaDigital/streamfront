@@ -5,12 +5,15 @@
  *  - ChatBubble: burbuja de chat izquierda/derecha (estilo WhatsApp)
  *  - ChatMessages: lista de mensajes
  *  - GiftPicker: panel de regalos
- *  - StagePanel: escenario multi-usuario (owner invita hasta 8 viewers)
- *  - StageGrid: grilla visual de participantes en el escenario
+ *  - GiftShopModal: modal tienda de regalos
+ *  - StagePanel: panel lateral para que el owner invite viewers al escenario
+ *  - StageGrid: grilla visual de participantes (avatares, sin video)
+ *  - StageTile: tile de video WebRTC real de un participante del escenario
+ *  - StageTilesRow: fila de StageTiles superpuesta al video del streamer
  */
 
 import { useMemo, useRef, useEffect } from "react";
-import { X, ShoppingBag, Mic, MicOff } from "lucide-react";
+import { X, ShoppingBag } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos compartidos
@@ -81,7 +84,7 @@ export function ChatBubble({ msg, isSelf, isOwner, color }: ChatBubbleProps) {
         padding: "0 10px",
       }}
     >
-      {/* Nombre del emisor — solo visible si NO soy yo */}
+      {/* Nombre del emisor — visible siempre excepto cuando soy yo */}
       {!isSelf && (
         <span
           style={{
@@ -159,6 +162,7 @@ export function ChatBubble({ msg, isSelf, isOwner, color }: ChatBubbleProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 interface ChatMessagesProps {
   chat: ChatMsg[];
+  /** Username real del usuario logueado (viene de AuthContext) */
   myUsername: string;
   ownerUsername: string;
 }
@@ -180,7 +184,10 @@ export function ChatMessages({ chat, myUsername, ownerUsername }: ChatMessagesPr
           <ChatBubble
             key={i}
             msg={m}
-            isSelf={m.username === myUsername}
+            isSelf={
+              !!myUsername &&
+              m.username.toLowerCase().trim() === myUsername.toLowerCase().trim()
+            }
             isOwner={m.username === ownerUsername}
             color={getColor(m.username)}
           />
@@ -357,14 +364,13 @@ export interface StageParticipant {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StageGrid — Grilla visual de participantes encima del video
-// Muestra un avatar/nombre por cada participante en el escenario
+// StageGrid — Grilla visual de participantes (avatares, sin video real)
+// Usalo si NO tenés WebRTC de escenario activo
 // ─────────────────────────────────────────────────────────────────────────────
 interface StageGridProps {
   participants: StageParticipant[];
   streamerName: string;
   isOwner: boolean;
-  /** Si el owner quiere quitar a alguien desde la grilla */
   onRemove?: (socketId: string) => void;
 }
 
@@ -398,7 +404,6 @@ export function StageGrid({ participants, streamerName, isOwner, onRemove }: Sta
             pointerEvents: "auto",
           }}
         >
-          {/* Avatar circular con inicial */}
           <div
             style={{
               width: 52,
@@ -420,7 +425,6 @@ export function StageGrid({ participants, streamerName, isOwner, onRemove }: Sta
             onClick={() => isOwner && onRemove?.(p.socketId)}
           >
             {p.name.charAt(0).toUpperCase()}
-            {/* Indicador de mic activo */}
             <span
               style={{
                 position: "absolute",
@@ -433,7 +437,6 @@ export function StageGrid({ participants, streamerName, isOwner, onRemove }: Sta
                 border: "2px solid #0a0a14",
               }}
             />
-            {/* X para quitar (owner only) */}
             {isOwner && (
               <span
                 style={{
@@ -458,7 +461,6 @@ export function StageGrid({ participants, streamerName, isOwner, onRemove }: Sta
               </span>
             )}
           </div>
-          {/* Nombre con fondo semitransparente */}
           <span
             style={{
               fontSize: 10,
@@ -561,6 +563,238 @@ export function StagePanel({ viewerList, stageParticipants, onInvite, onRemove }
           No hay viewers disponibles para invitar
         </p>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StageTileStream — tipo para un tile de video del escenario
+// ─────────────────────────────────────────────────────────────────────────────
+export interface StageTileStream {
+  socketId: string;
+  name: string;
+  stream: MediaStream | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StageTile — tile de video WebRTC real de un participante del escenario
+// Estilo TikTok Live: video vertical pequeño superpuesto al stream principal
+// ─────────────────────────────────────────────────────────────────────────────
+interface StageTileProps {
+  tile: StageTileStream;
+  isOwner: boolean;
+  onRemove?: (socketId: string) => void;
+}
+
+export function StageTile({ tile, isOwner, onRemove }: StageTileProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !tile.stream) return;
+    el.srcObject = tile.stream;
+    el.play().catch(() => {});
+    return () => {
+      el.srcObject = null;
+    };
+  }, [tile.stream]);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 110,
+        height: 150,
+        borderRadius: 14,
+        overflow: "hidden",
+        border: "2px solid rgba(124,58,237,0.7)",
+        background: "#0a0a14",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)",
+        flexShrink: 0,
+        transition: "border-color 0.2s",
+      }}
+    >
+      {/* Video real */}
+      {tile.stream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={false}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            transform: "scaleX(-1)", // espejo natural
+            display: "block",
+          }}
+        />
+      ) : (
+        /* Fallback: avatar con inicial si no hay stream todavía */
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 38,
+            fontWeight: 800,
+            color: "#fff",
+            background: "linear-gradient(135deg, #7c3aed 0%, #db2777 100%)",
+          }}
+        >
+          {tile.name.charAt(0).toUpperCase()}
+        </div>
+      )}
+
+      {/* Gradiente inferior + nombre */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "20px 8px 6px",
+          background: "linear-gradient(transparent, rgba(0,0,0,0.82))",
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#fff",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "100%",
+            letterSpacing: 0.2,
+            textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+          }}
+        >
+          {tile.name}
+        </span>
+      </div>
+
+      {/* Indicador "EN VIVO" verde */}
+      <div
+        style={{
+          position: "absolute",
+          top: 7,
+          left: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          background: "rgba(0,0,0,0.55)",
+          borderRadius: 6,
+          padding: "2px 6px",
+        }}
+      >
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "#22c55e",
+            display: "inline-block",
+            boxShadow: "0 0 6px #22c55e",
+            animation: "stageDot 1.4s ease-in-out infinite",
+          }}
+        />
+        <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", letterSpacing: 0.5 }}>
+          LIVE
+        </span>
+      </div>
+
+      {/* Botón × para quitar (solo owner) */}
+      {isOwner && (
+        <button
+          onClick={() => onRemove?.(tile.socketId)}
+          title={`Quitar a ${tile.name} del escenario`}
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 22,
+            height: 22,
+            borderRadius: "50%",
+            background: "rgba(239,68,68,0.9)",
+            border: "1.5px solid rgba(255,255,255,0.3)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 900,
+            lineHeight: 1,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            transition: "background 0.15s, transform 0.1s",
+            padding: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(220,38,38,1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.9)")}
+        >
+          ×
+        </button>
+      )}
+
+      {/* Keyframe para el dot pulsante — inyectado una sola vez */}
+      <style>{`
+        @keyframes stageDot {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.35; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StageTilesRow — columna de tiles WebRTC superpuesta al video del streamer
+// Posicionada a la derecha del área de video, estilo TikTok Live
+// ─────────────────────────────────────────────────────────────────────────────
+interface StageTilesRowProps {
+  tiles: StageTileStream[];
+  isOwner: boolean;
+  onRemove?: (socketId: string) => void;
+}
+
+export function StageTilesRow({ tiles, isOwner, onRemove }: StageTilesRowProps) {
+  if (tiles.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        // Apilados desde arriba-derecha, respetando el badge de viewers
+        top: 48,
+        right: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        zIndex: 10,
+        // Si hay muchos participantes, hacemos scroll interno
+        maxHeight: "calc(100% - 130px)",
+        overflowY: "auto",
+        overflowX: "hidden",
+        paddingBottom: 4,
+        // Ocultar scrollbar pero permitir scroll
+        scrollbarWidth: "none",
+        msOverflowStyle: "none" as React.CSSProperties["msOverflowStyle"],
+      }}
+    >
+      {tiles.map((tile) => (
+        <StageTile
+          key={tile.socketId}
+          tile={tile}
+          isOwner={isOwner}
+          onRemove={onRemove}
+        />
+      ))}
     </div>
   );
 }
