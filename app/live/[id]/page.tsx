@@ -9,13 +9,13 @@ import {
 } from "lucide-react";
 import "./live.css";
 
-
 // Importamos todos los helpers / sub-componentes
 import {
   ChatMessages,
   GiftPicker,
   GiftShopModal,
   StagePanel,
+  StageGrid,          // ← nuevo componente visual
   GIFT_EMOJIS,
   GIFT_LABELS,
   type ChatMsg,
@@ -28,7 +28,7 @@ import {
 const BACKEND = "https://stream-72mw.onrender.com";
 
 type LiveStatus = "waiting" | "live" | "ended";
-type LiveData   = {
+type LiveData = {
   _id: string; title: string; description?: string; category?: string;
   status: LiveStatus; hlsUrl?: string; vodUrl?: string; thumbnail?: string;
   streamKey?: string;
@@ -39,7 +39,7 @@ const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "turn:openrelay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
     { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
   ],
 };
@@ -50,7 +50,7 @@ function getStoredUser(): { id: string; name: string } {
     if (!token) return { id: "", name: "" };
     const payload = JSON.parse(atob(token.split(".")[1]));
     return {
-      id:   String(payload?.id   ?? payload?._id      ?? ""),
+      id: String(payload?.id ?? payload?._id ?? ""),
       name: String(payload?.name ?? payload?.username ?? ""),
     };
   } catch {
@@ -75,20 +75,20 @@ export default function LivePage() {
   const autoPlayRetryRef = useRef<(() => void) | null>(null);
 
   // ── Estado base ───────────────────────────────────────────────────────────
-  const [live,        setLive]        = useState<LiveData | null>(null);
-  const [isOwner,     setIsOwner]     = useState<boolean | null>(null);
-  const [chat,        setChat]        = useState<ChatMsg[]>([]);
-  const [msg,         setMsg]         = useState("");
-  const [viewers,     setViewers]     = useState(0);
-  const [giftAnim,    setGiftAnim]    = useState<GiftMsg | null>(null);
-  const [error,       setError]       = useState<string | null>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [micOn,       setMicOn]       = useState(true);
-  const [camOn,       setCamOn]       = useState(true);
-  const [connected,   setConnected]   = useState(false);
-  const [giftOpen,    setGiftOpen]    = useState(false);
-  const [ending,      setEnding]      = useState(false);
-  const [needsTap,    setNeedsTap]    = useState(false);
+  const [live,      setLive]      = useState<LiveData | null>(null);
+  const [isOwner,   setIsOwner]   = useState<boolean | null>(null);
+  const [chat,      setChat]      = useState<ChatMsg[]>([]);
+  const [msg,       setMsg]       = useState("");
+  const [viewers,   setViewers]   = useState(0);
+  const [giftAnim,  setGiftAnim]  = useState<GiftMsg | null>(null);
+  const [error,     setError]     = useState<string | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [micOn,     setMicOn]     = useState(true);
+  const [camOn,     setCamOn]     = useState(true);
+  const [connected, setConnected] = useState(false);
+  const [giftOpen,  setGiftOpen]  = useState(false);
+  const [ending,    setEnding]    = useState(false);
+  const [needsTap,  setNeedsTap]  = useState(false);
 
   // ── Estado viewers + compartir ────────────────────────────────────────────
   const [viewerList,   setViewerList]   = useState<ViewerInfo[]>([]);
@@ -237,11 +237,7 @@ export default function LivePage() {
     s.on("live:viewerCount", ({ count }: { count: number }) => setViewers(count));
     s.on("live:viewerList",  ({ viewers: vl }: { viewers: ViewerInfo[] }) => setViewerList(vl));
     s.on("live:shareState",  ({ enabled }: { enabled: boolean }) => setShareEnabled(enabled));
-
-    // Evento nuevo: owner emitió cambio de cámara → todos los viewers actualizan
-    s.on("live:camState", ({ on }: { on: boolean }) => {
-      if (!isOwner) setCamOn(on);
-    });
+    s.on("live:camState",    ({ on }: { on: boolean }) => { if (!isOwner) setCamOn(on); });
 
     s.on("live:gift", (g: GiftMsg) => {
       setGiftAnim(g);
@@ -252,7 +248,7 @@ export default function LivePage() {
       setLive((p) => (p ? { ...p, status: "ended" } : p));
     });
 
-    // Eventos del escenario
+    // ── Escenario: recibir actualización ──────────────────────────────────
     s.on("live:stageUpdate", ({ participants }: { participants: StageParticipant[] }) => {
       setStageParticipants(participants);
     });
@@ -276,8 +272,8 @@ export default function LivePage() {
       peerConnRef.current = pc;
 
       pc.ontrack = (e) => {
-        const stream   = e.streams[0];
-        const videoEl  = remoteVideoRef.current;
+        const stream  = e.streams[0];
+        const videoEl = remoteVideoRef.current;
         if (!stream || !videoEl) return;
         videoEl.srcObject = stream;
         videoEl.muted     = true;
@@ -453,14 +449,11 @@ export default function LivePage() {
     setMicOn(t.enabled);
   };
 
-  // Al apagar/prender cámara, también lo emitimos para que los viewers
-  // vean el placeholder "Cámara apagada"
   const toggleCam = () => {
     const t = localStreamRef.current?.getVideoTracks()[0];
     if (!t) return;
     t.enabled = !t.enabled;
     setCamOn(t.enabled);
-    // Notificar a todos los viewers
     socketRef.current?.emit("live:camState", { liveId: id, on: t.enabled });
   };
 
@@ -475,7 +468,7 @@ export default function LivePage() {
         method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
       socketRef.current?.emit("live:ownerEnd", { liveId: id });
-      socketRef.current?.emit("live:leave",    { liveId: id });
+      socketRef.current?.emit("live:leave", { liveId: id });
       socketRef.current?.disconnect();
       socketRef.current = null;
       setLive((p) => (p ? { ...p, status: "ended" } : p));
@@ -549,7 +542,7 @@ export default function LivePage() {
           />
         )}
 
-        {/* Video remoto (viewer) — visible solo si está conectado Y cámara encendida */}
+        {/* Video remoto (viewer) */}
         {!isOwner && (
           <>
             <video
@@ -561,7 +554,6 @@ export default function LivePage() {
               style={{ display: (connected && camOn) ? "block" : "none" }}
             />
 
-            {/* Tap para ver (autoplay bloqueado) */}
             {connected && camOn && needsTap && (
               <button
                 onClick={() => autoPlayRetryRef.current?.()}
@@ -585,7 +577,6 @@ export default function LivePage() {
               </button>
             )}
 
-            {/* Cámara apagada — para todos los viewers */}
             {connected && !camOn && (
               <div className="live-video-placeholder">
                 <VideoOff size={40} strokeWidth={1} />
@@ -593,7 +584,6 @@ export default function LivePage() {
               </div>
             )}
 
-            {/* No conectado aún */}
             {!connected && (
               <div className="live-video-placeholder">
                 <Radio size={40} strokeWidth={1} />
@@ -609,6 +599,17 @@ export default function LivePage() {
             <VideoOff size={40} strokeWidth={1} />
             <span>Cámara apagada</span>
           </div>
+        )}
+
+        {/* ── Grilla de participantes del escenario ─────────────────────────
+            Visible para TODOS (owner y viewers) cuando hay participantes     */}
+        {stageParticipants.length > 0 && (
+          <StageGrid
+            participants={stageParticipants}
+            streamerName={streamerName}
+            isOwner={!!isOwner}
+            onRemove={removeFromStage}
+          />
         )}
 
         {/* Badges */}
@@ -781,7 +782,7 @@ export default function LivePage() {
           )}
         </div>
 
-        {/* ── Chat messages (componente extraído) ────────────────────────── */}
+        {/* ── Chat messages ─────────────────────────────────────────────── */}
         <ChatMessages
           chat={chat}
           myUsername={myUsername}
@@ -841,7 +842,6 @@ export default function LivePage() {
         />
       )}
 
-      {/* ── Estilos inline mínimos (solo lo que no va en live.css) ─────────── */}
       <style>{`
         .live-end-btn {
           display: flex; align-items: center; gap: 6px;
