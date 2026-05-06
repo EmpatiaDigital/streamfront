@@ -16,6 +16,7 @@
  *   - Tipos y constantes de gifts
  */
 
+
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, X, ShoppingBag, ChevronDown } from "lucide-react";
 import "./helpers.css";
