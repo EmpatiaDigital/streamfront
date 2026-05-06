@@ -2,7 +2,6 @@
 
 /* ── Reset / base ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
-
 /* ── Root layout ───────────────────────────────────────────────── */
 .live-root {
   display: flex;
