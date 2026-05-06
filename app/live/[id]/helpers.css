@@ -1,0 +1,655 @@
+/* ═══════════════════════════════════════════════════════════════
+   helpers.css  —  Estilos exclusivos de LiveHelpers.tsx
+   (ChatMessages, GiftPicker, GiftShopModal, StagePanel, StageTilesRow)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Variables compartidas (re-declaradas para autonomía del archivo) */
+:root {
+  --bg-root:       #0a0a14;
+  --bg-chat:       #0d0d1e;
+  --border-subtle: rgba(255,255,255,0.07);
+  --text-primary:  #e2e8f0;
+  --text-muted:    rgba(255,255,255,0.35);
+  --accent:        #7c3aed;
+  --accent-light:  #a78bfa;
+  --danger:        #ef4444;
+  --danger-text:   #f87171;
+  --warn-text:     #fbbf24;
+  --green:         #a3e635;
+  --font:          "DM Sans", system-ui, -apple-system, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHAT MESSAGES
+   ═══════════════════════════════════════════════════════════════ */
+.live-chat-empty {
+  text-align: center;
+  color: rgba(255,255,255,0.22);
+  font-size: 13px;
+  margin-top: 24px;
+  font-style: italic;
+}
+
+/* Burbuja de mensaje */
+.live-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 84%;
+  gap: 2px;
+  animation: msgSlideIn 0.18s ease;
+}
+.live-msg--left  { align-self: flex-start; align-items: flex-start; }
+.live-msg--right { align-self: flex-end;   align-items: flex-end;   }
+
+.live-msg-name {
+  font-size: 10px;
+  font-weight: 700;
+  margin: 0 4px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.live-msg--right .live-msg-name { color: rgba(167,139,250,0.7); }
+
+.live-msg-bubble {
+  padding: 7px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+  font-family: var(--font);
+}
+.live-msg--left  .live-msg-bubble {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.88);
+  border-bottom-left-radius: 4px;
+}
+.live-msg--right .live-msg-bubble {
+  background: rgba(124,58,237,0.33);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+/* Badge "HOST" */
+.live-msg-owner-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  background: rgba(163,230,53,0.18);
+  color: var(--green);
+  border: 1px solid rgba(163,230,53,0.28);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+  letter-spacing: 0.05em;
+}
+
+@keyframes msgSlideIn {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GIFT PICKER (panel inferior del chat)
+   ═══════════════════════════════════════════════════════════════ */
+.live-gift-picker {
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.28);
+  flex-shrink: 0;
+  padding: 0 0 4px;
+}
+.live-gift-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.65);
+}
+.live-gift-picker-header button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  padding: 2px;
+  display: flex; align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.live-gift-picker-header button:hover { color: rgba(255,255,255,0.7); }
+
+.live-gift-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+.live-gift-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+  font-family: var(--font);
+  color: #fff;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.live-gift-item:hover:not(:disabled) {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.16);
+  transform: translateY(-1px);
+}
+.live-gift-item:active:not(:disabled) { transform: scale(0.93); }
+.live-gift-item:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.live-gift-emoji { font-size: 22px; line-height: 1; }
+.live-gift-label { font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.5); }
+.live-gift-balance {
+  font-size: 9px;
+  color: rgba(255,255,255,0.3);
+}
+
+/* Fila "abrir tienda" */
+.live-gift-shop-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 10px 6px;
+}
+.live-gift-shop-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-light);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-family: var(--font);
+  transition: opacity 0.15s;
+}
+.live-gift-shop-btn:hover { opacity: 0.75; }
+
+/* Mobile: 3 cols en gift picker */
+@media (max-width: 680px) {
+  .live-gift-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 10px 10px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GIFT SHOP MODAL
+   ═══════════════════════════════════════════════════════════════ */
+.live-shop-modal {
+  background: #13132a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 18px 32px;
+  width: 100%;
+  max-height: 70dvh;
+  overflow-y: auto;
+  font-family: var(--font);
+}
+@media (min-width: 641px) {
+  .live-shop-modal {
+    border-radius: 20px;
+    max-width: 420px;
+    max-height: 80dvh;
+  }
+}
+
+.live-shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.live-shop-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.live-shop-close {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.5);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.15s;
+}
+.live-shop-close:hover { background: rgba(255,255,255,0.13); }
+
+.live-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.live-shop-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.04);
+}
+.live-shop-emoji { font-size: 28px; flex-shrink: 0; }
+.live-shop-info  { flex: 1; min-width: 0; }
+.live-shop-name  { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.live-shop-stock {
+  font-size: 11px;
+  color: rgba(255,255,255,0.38);
+  margin-top: 1px;
+}
+.live-shop-buy-btn {
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(124,58,237,0.65);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, opacity 0.15s;
+}
+.live-shop-buy-btn:hover:not(:disabled) { background: var(--accent); }
+.live-shop-buy-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════
+   STAGE PANEL (panel de control del owner en el sidebar)
+   ═══════════════════════════════════════════════════════════════ */
+.live-stage-panel {
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  font-family: var(--font);
+}
+.live-stage-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.live-stage-panel-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.42);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.live-stage-panel-toggle {
+  font-size: 10px;
+  color: rgba(255,255,255,0.28);
+  transition: transform 0.2s;
+}
+.live-stage-panel-toggle.open { transform: rotate(180deg); }
+
+/* Slots activos */
+.live-stage-slots {
+  padding: 0 11px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.live-stage-slot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 8px;
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.22);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-light);
+  max-width: 100%;
+}
+.live-stage-slot-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  animation: live-blink 2s ease-in-out infinite;
+}
+
+/* Controles del admin sobre el participante del escenario */
+.live-stage-slot-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 3px;
+}
+.live-stage-slot-ctrl {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  transition: background 0.15s, opacity 0.15s;
+}
+.live-stage-slot-ctrl.mute {
+  background: rgba(245,158,11,0.22);
+  color: var(--warn-text);
+}
+.live-stage-slot-ctrl.mute:hover { background: rgba(245,158,11,0.4); }
+.live-stage-slot-ctrl.mute.active {
+  background: rgba(239,68,68,0.25);
+  color: var(--danger-text);
+}
+.live-stage-slot-ctrl.cam {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.55);
+}
+.live-stage-slot-ctrl.cam:hover { background: rgba(255,255,255,0.15); }
+.live-stage-slot-ctrl.cam.active {
+  background: rgba(239,68,68,0.22);
+  color: var(--danger-text);
+}
+.live-stage-slot-ctrl.kick {
+  background: rgba(239,68,68,0.18);
+  color: var(--danger-text);
+}
+.live-stage-slot-ctrl.kick:hover { background: rgba(239,68,68,0.38); }
+
+/* Row de invitar */
+.live-stage-add-row {
+  padding: 0 11px 10px;
+}
+.live-stage-invite-select {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+}
+.live-stage-invite-select:focus { border-color: rgba(124,58,237,0.5); }
+.live-stage-invite-select option {
+  background: #1a1a2e;
+  color: var(--text-primary);
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STAGE TILES ROW  —  videos del escenario sobre el video principal
+   ═══════════════════════════════════════════════════════════════ */
+
+/*
+  Contenedor raíz: ocupa el borde inferior del área de video.
+  Los tiles NO tapan el stream principal; se solapan en la parte
+  inferior como en TikTok Live.
+*/
+.live-stage-tiles {
+  position: absolute;
+  bottom: 70px;          /* deja espacio a los controles mic/cam */
+  left: 0; right: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 12px;
+  z-index: 8;
+  pointer-events: none;   /* el contenedor no bloquea clics */
+  flex-wrap: wrap;
+}
+
+/* Tile individual */
+.live-stage-tile {
+  position: relative;
+  pointer-events: all;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.18);
+  background: #0a0a14;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  flex-shrink: 0;
+
+  /* Tamaño base: portrait 9:16 pequeño */
+  width: 80px;
+  height: 120px;
+
+  transition: border-color 0.2s;
+}
+.live-stage-tile:hover { border-color: rgba(255,255,255,0.38); }
+
+/* Video dentro del tile */
+.live-stage-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1);   /* espejo (selfie) */
+}
+
+/* Label nombre */
+.live-stage-tile-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 18px 4px 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  font-family: var(--font);
+  pointer-events: none;
+}
+
+/* Botón "quitar del escenario" (solo visible para el owner al hacer hover) */
+.live-stage-tile-remove {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(239,68,68,0.85);
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+  line-height: 1;
+}
+.live-stage-tile:hover .live-stage-tile-remove { opacity: 1; }
+
+/* Controles admin (silenciar mic / apagar cam) que el owner ve sobre cada tile */
+.live-stage-tile-admin {
+  position: absolute;
+  top: 4px; left: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.live-stage-tile:hover .live-stage-tile-admin { opacity: 1; }
+
+.live-stage-tile-ctrl {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  transition: background 0.15s;
+}
+.live-stage-tile-ctrl.mic-on {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+.live-stage-tile-ctrl.mic-off {
+  background: rgba(239,68,68,0.7);
+  color: #fff;
+}
+.live-stage-tile-ctrl.cam-on {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+.live-stage-tile-ctrl.cam-off {
+  background: rgba(239,68,68,0.7);
+  color: #fff;
+}
+
+/* ── Indicador "mic silenciado" siempre visible ─────────────────── */
+.live-stage-tile-muted-badge {
+  position: absolute;
+  top: 4px; left: 4px;
+  background: rgba(239,68,68,0.8);
+  border-radius: 50%;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* ── Controles propios del invitado (SU mic/cam) ────────────────── */
+/*
+  Se muestran en la parte inferior del área de video cuando el viewer
+  está en el escenario. Se posicionan junto a los controles del owner.
+*/
+.live-stage-self-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 12;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 8px 14px;
+  border-radius: 30px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+/* Botón individual de self-control */
+.live-stage-self-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.live-stage-self-btn:hover  { background: rgba(255,255,255,0.18); }
+.live-stage-self-btn:active { transform: scale(0.93); }
+.live-stage-self-btn.off {
+  background: rgba(239,68,68,0.2);
+  border-color: rgba(239,68,68,0.5);
+  color: var(--danger-text);
+}
+
+/* ── Distribución responsive de tiles ───────────────────────────── */
+
+/* ≥ 4 tiles: se hacen más pequeños para no tapar todo */
+.live-stage-tiles[data-count="4"] .live-stage-tile,
+.live-stage-tiles[data-count="5"] .live-stage-tile,
+.live-stage-tiles[data-count="6"] .live-stage-tile {
+  width: 66px;
+  height: 100px;
+}
+
+.live-stage-tiles[data-count="7"] .live-stage-tile,
+.live-stage-tiles[data-count="8"] .live-stage-tile,
+.live-stage-tiles[data-count="9"] .live-stage-tile {
+  width: 56px;
+  height: 84px;
+}
+
+/* ── MOBILE: tiles más pequeños y en dos filas si hacen falta ────── */
+@media (max-width: 680px) {
+  .live-stage-tiles {
+    bottom: 60px;
+    padding: 0 8px;
+    gap: 5px;
+  }
+
+  .live-stage-tile {
+    width: 66px;
+    height: 96px;
+    border-radius: 8px;
+  }
+
+  /* Con 4+ tiles en mobile */
+  .live-stage-tiles[data-count="4"] .live-stage-tile,
+  .live-stage-tiles[data-count="5"] .live-stage-tile,
+  .live-stage-tiles[data-count="6"] .live-stage-tile {
+    width: 54px;
+    height: 80px;
+  }
+
+  .live-stage-tiles[data-count="7"] .live-stage-tile,
+  .live-stage-tiles[data-count="8"] .live-stage-tile,
+  .live-stage-tiles[data-count="9"] .live-stage-tile {
+    width: 46px;
+    height: 68px;
+  }
+
+  /* Self-controls: más compactos en mobile */
+  .live-stage-self-controls {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  .live-stage-self-btn {
+    width: 40px; height: 40px;
+  }
+
+  /* Controles admin en tiles: siempre visibles en mobile (sin hover) */
+  .live-stage-tile-admin,
+  .live-stage-tile-remove {
+    opacity: 1;
+  }
+}
+
+/* ── Landscape mobile ────────────────────────────────────────────── */
+@media (max-width: 896px) and (orientation: landscape) and (max-height: 430px) {
+  .live-stage-tiles {
+    flex-direction: column;
+    bottom: auto;
+    top: 12px;
+    right: 12px;
+    left: auto;
+    align-items: flex-end;
+    justify-content: flex-start;
+    padding: 0;
+    gap: 5px;
+  }
+  .live-stage-tile {
+    width: 70px;
+    height: 52px;   /* landscape ratio */
+  }
+}
