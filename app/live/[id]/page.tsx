@@ -5,35 +5,33 @@ import { useParams, useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import {
   Mic, MicOff, Video, VideoOff, Square, Send, Gift,
-  X, Users, Radio, Clock, PhoneOff, ShoppingBag, Link, Link2Off,
+  X, Users, Radio, Clock, PhoneOff, Link, Link2Off,
 } from "lucide-react";
 import "./live.css";
 
+// Importamos todos los helpers / sub-componentes
+import {
+  ChatMessages,
+  GiftPicker,
+  GiftShopModal,
+  StagePanel,
+  GIFT_EMOJIS,
+  GIFT_LABELS,
+  type ChatMsg,
+  type GiftMsg,
+  type Balance,
+  type ViewerInfo,
+  type StageParticipant,
+} from "./LiveHelpers";
+
 const BACKEND = "https://stream-72mw.onrender.com";
 
-type ChatMsg    = { username: string; message: string; at: string; avatar?: string };
-type GiftMsg    = { from: string; type: string; amount: number; message?: string };
 type LiveStatus = "waiting" | "live" | "ended";
 type LiveData   = {
   _id: string; title: string; description?: string; category?: string;
   status: LiveStatus; hlsUrl?: string; vodUrl?: string; thumbnail?: string;
   streamKey?: string;
   user?: { _id: string; name: string; avatar?: string } | string;
-};
-type Balance    = Record<string, number>;
-type ViewerInfo = { name: string; joinedAt: string };
-
-const GIFT_EMOJIS: Record<string, string> = {
-  corazon:  "❤️", estrella: "⭐", fuego:    "🔥",
-  diamante: "💎", corona:   "👑", cohete:   "🚀",
-};
-const GIFT_LABELS: Record<string, string> = {
-  corazon:  "Corazón",  estrella: "Estrella", fuego:    "Fuego",
-  diamante: "Diamante", corona:   "Corona",   cohete:   "Cohete",
-};
-const GIFT_PRICE: Record<string, string> = {
-  corazon:  "gratis", estrella: "gratis", fuego:    "gratis",
-  diamante: "$0.99",  corona:   "$1.49",  cohete:   "$1.99",
 };
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -71,10 +69,8 @@ export default function LivePage() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnsRef   = useRef<Map<string, RTCPeerConnection>>(new Map());
   const peerConnRef    = useRef<RTCPeerConnection | null>(null);
-  const chatEndRef     = useRef<HTMLDivElement>(null);
   const streamReadyRef = useRef(false);
   const socketReadyRef = useRef(false);
-  // Ref para reintentar play() si el autoplay falla
   const autoPlayRetryRef = useRef<(() => void) | null>(null);
 
   // ── Estado base ───────────────────────────────────────────────────────────
@@ -91,7 +87,6 @@ export default function LivePage() {
   const [connected,   setConnected]   = useState(false);
   const [giftOpen,    setGiftOpen]    = useState(false);
   const [ending,      setEnding]      = useState(false);
-  // Pantalla negra: mostrar botón "Tap para ver" cuando autoplay es bloqueado
   const [needsTap,    setNeedsTap]    = useState(false);
 
   // ── Estado viewers + compartir ────────────────────────────────────────────
@@ -108,10 +103,18 @@ export default function LivePage() {
   const [buying,      setBuying]      = useState<string | null>(null);
   const [sendingGift, setSendingGift] = useState<string | null>(null);
 
+  // ── Estado del escenario ──────────────────────────────────────────────────
+  const [stageParticipants, setStageParticipants] = useState<StageParticipant[]>([]);
+
   // ── URL para compartir ────────────────────────────────────────────────────
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/live/${id}`
     : "";
+
+  const streamerName =
+    typeof live?.user === "object" ? live.user?.name ?? "Streamer" : "Streamer";
+
+  const { name: myUsername } = getStoredUser();
 
   // ── Limpieza total ────────────────────────────────────────────────────────
   const fullCleanup = useCallback(() => {
@@ -128,39 +131,27 @@ export default function LivePage() {
     autoPlayRetryRef.current = null;
   }, []);
 
-  // ── Helper: intentar reproducir video remoto ──────────────────────────────
-  // Esto resuelve la pantalla negra en Chrome/Safari por política de autoplay
+  // ── Helper: intentar play() en video remoto ───────────────────────────────
   const tryPlayRemote = useCallback((videoEl: HTMLVideoElement) => {
-    const attempt = () => {
-      videoEl.play()
-        .then(() => {
-          setNeedsTap(false);
-          autoPlayRetryRef.current = null;
-        })
-        .catch((err) => {
-          // NotAllowedError = autoplay bloqueado, mostrar botón de tap
-          if (err.name === "NotAllowedError" || err.name === "AbortError") {
-            setNeedsTap(true);
-            // Guardar ref para llamar al hacer tap
-            autoPlayRetryRef.current = () => {
-              videoEl.muted = false;
-              videoEl.play()
-                .then(() => setNeedsTap(false))
-                .catch(() => {});
-            };
-          }
-        });
-    };
-    attempt();
+    videoEl.play()
+      .then(() => { setNeedsTap(false); autoPlayRetryRef.current = null; })
+      .catch((err) => {
+        if (err.name === "NotAllowedError" || err.name === "AbortError") {
+          setNeedsTap(true);
+          autoPlayRetryRef.current = () => {
+            videoEl.muted = false;
+            videoEl.play().then(() => setNeedsTap(false)).catch(() => {});
+          };
+        }
+      });
   }, []);
 
-  // ── registerStreamer cuando ambos (socket + cámara) están listos ──────────
+  // ── registerStreamer cuando ambos listos ──────────────────────────────────
   const tryRegisterStreamer = useCallback(() => {
     if (!socketReadyRef.current || !streamReadyRef.current) return;
     if (!socketRef.current?.connected) return;
     const { name } = getStoredUser();
     socketRef.current.emit("live:registerStreamer", { liveId: id, username: name });
-    console.log("📡 live:registerStreamer emitido");
   }, [id]);
 
   // ── PASO 1: Cargar live y determinar isOwner ──────────────────────────────
@@ -168,7 +159,6 @@ export default function LivePage() {
     if (!id) return;
     const token = localStorage.getItem("token");
     const { id: myId } = getStoredUser();
-
     fetch(`${BACKEND}/api/live/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -181,8 +171,7 @@ export default function LivePage() {
           typeof liveData.user === "object"
             ? String(liveData.user?._id ?? "")
             : String(liveData.user ?? "");
-        const owner = !!myId && !!ownerId && myId === ownerId;
-        setIsOwner(owner);
+        setIsOwner(!!myId && !!ownerId && myId === ownerId);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -200,7 +189,7 @@ export default function LivePage() {
       .catch(() => {});
   }, [isOwner]);
 
-  // ── PASO 2: Crear PeerConnection streamer → viewer ────────────────────────
+  // ── Crear PeerConnection streamer → viewer ────────────────────────────────
   const createStreamerPC = useCallback(
     (viewerSocketId: string, stream: MediaStream): RTCPeerConnection => {
       peerConnsRef.current.get(viewerSocketId)?.close();
@@ -220,10 +209,9 @@ export default function LivePage() {
     []
   );
 
-  // ── PASO 3: Socket.IO ─────────────────────────────────────────────────────
+  // ── Socket.IO ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id || isOwner === null) return;
-
     const token = localStorage.getItem("token");
     const s = io(BACKEND, {
       auth: { token },
@@ -249,6 +237,11 @@ export default function LivePage() {
     s.on("live:viewerList",  ({ viewers: vl }: { viewers: ViewerInfo[] }) => setViewerList(vl));
     s.on("live:shareState",  ({ enabled }: { enabled: boolean }) => setShareEnabled(enabled));
 
+    // Evento nuevo: owner emitió cambio de cámara → todos los viewers actualizan
+    s.on("live:camState", ({ on }: { on: boolean }) => {
+      if (!isOwner) setCamOn(on);
+    });
+
     s.on("live:gift", (g: GiftMsg) => {
       setGiftAnim(g);
       setTimeout(() => setGiftAnim(null), 3500);
@@ -256,6 +249,11 @@ export default function LivePage() {
     s.on("live:ended", () => {
       fullCleanup();
       setLive((p) => (p ? { ...p, status: "ended" } : p));
+    });
+
+    // Eventos del escenario
+    s.on("live:stageUpdate", ({ participants }: { participants: StageParticipant[] }) => {
+      setStageParticipants(participants);
     });
 
     // Streamer recibe viewer nuevo
@@ -267,66 +265,44 @@ export default function LivePage() {
       s.emit("webrtc:offer", { targetSocketId: viewerSocketId, sdp: offer });
     });
 
-    // ── FIX PANTALLA NEGRA: Viewer recibe oferta ──────────────────────────
+    // Viewer recibe oferta
     s.on("webrtc:offer", async ({
-      streamerSocketId,
-      sdp,
-    }: {
-      streamerSocketId: string;
-      sdp: RTCSessionDescriptionInit;
-    }) => {
+      streamerSocketId, sdp,
+    }: { streamerSocketId: string; sdp: RTCSessionDescriptionInit }) => {
       if (isOwner) return;
       peerConnRef.current?.close();
-
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnRef.current = pc;
 
       pc.ontrack = (e) => {
-        const stream = e.streams[0];
-        if (!stream) return;
-
-        const videoEl = remoteVideoRef.current;
-        if (!videoEl) return;
-
-        // 1. Asignar el stream ANTES de llamar play()
+        const stream   = e.streams[0];
+        const videoEl  = remoteVideoRef.current;
+        if (!stream || !videoEl) return;
         videoEl.srcObject = stream;
-
-        // 2. Chrome necesita muted=true para autoplay sin interacción previa.
-        //    Lo quitamos luego del primer play exitoso.
-        videoEl.muted = true;
-
-        // 3. Llamar play() explícitamente (autoPlay attr no siempre alcanza)
+        videoEl.muted     = true;
         videoEl.play()
           .then(() => {
-            // Play exitoso con muted → quitar mute y mostrar video
             videoEl.muted = false;
             setConnected(true);
             setNeedsTap(false);
           })
           .catch((err) => {
             if (err.name === "AbortError") {
-              // Interrumpido por otra llamada, reintentar
               setTimeout(() => tryPlayRemote(videoEl), 300);
               return;
             }
-            // NotAllowedError: autoplay completamente bloqueado
-            // Mostrar botón "Tap para ver" y guardar callback
-            setConnected(true); // el stream está ahí, solo falta el play
+            setConnected(true);
             setNeedsTap(true);
             autoPlayRetryRef.current = () => {
               videoEl.muted = false;
-              videoEl.play()
-                .then(() => setNeedsTap(false))
-                .catch(() => {});
+              videoEl.play().then(() => setNeedsTap(false)).catch(() => {});
             };
           });
       };
 
       pc.onicecandidate = ({ candidate }) => {
-        if (candidate)
-          s.emit("webrtc:ice", { targetSocketId: streamerSocketId, candidate });
+        if (candidate) s.emit("webrtc:ice", { targetSocketId: streamerSocketId, candidate });
       };
-
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
         if (state === "connected") setConnected(true);
@@ -344,12 +320,8 @@ export default function LivePage() {
 
     // Streamer recibe answer
     s.on("webrtc:answer", async ({
-      viewerSocketId,
-      sdp,
-    }: {
-      viewerSocketId: string;
-      sdp: RTCSessionDescriptionInit;
-    }) => {
+      viewerSocketId, sdp,
+    }: { viewerSocketId: string; sdp: RTCSessionDescriptionInit }) => {
       if (!isOwner) return;
       const pc = peerConnsRef.current.get(viewerSocketId);
       if (!pc || pc.signalingState !== "have-local-offer") return;
@@ -358,12 +330,8 @@ export default function LivePage() {
 
     // ICE candidates
     s.on("webrtc:ice", async ({
-      fromSocketId,
-      candidate,
-    }: {
-      fromSocketId: string;
-      candidate: RTCIceCandidateInit;
-    }) => {
+      fromSocketId, candidate,
+    }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
       try {
         if (isOwner) {
           const pc = peerConnsRef.current.get(fromSocketId);
@@ -385,7 +353,7 @@ export default function LivePage() {
     };
   }, [id, isOwner, createStreamerPC, fullCleanup, tryRegisterStreamer, tryPlayRemote]);
 
-  // ── PASO 4: Cámara del streamer ───────────────────────────────────────────
+  // ── Cámara del streamer ───────────────────────────────────────────────────
   useEffect(() => {
     if (!isOwner || !id) return;
     navigator.mediaDevices
@@ -406,11 +374,6 @@ export default function LivePage() {
     return () => fullCleanup();
   }, [isOwner, id, fullCleanup, tryRegisterStreamer]);
 
-  // ── Auto-scroll chat ──────────────────────────────────────────────────────
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat]);
-
   // ── Acciones ──────────────────────────────────────────────────────────────
   const sendChat = () => {
     if (!msg.trim() || !id) return;
@@ -423,7 +386,6 @@ export default function LivePage() {
     try {
       await navigator.clipboard.writeText(shareUrl);
     } catch {
-      // fallback para entornos sin clipboard API
       const el = document.createElement("input");
       el.value = shareUrl;
       document.body.appendChild(el);
@@ -441,16 +403,16 @@ export default function LivePage() {
     socketRef.current?.emit("live:setShare", { liveId: id, enabled: next });
   };
 
-  const sendGift = async (type: string, amount = 1) => {
+  const sendGift = async (type: string) => {
     if (!id || sendingGift) return;
-    if ((balance[type] ?? 0) < amount) { setBuyOpen(true); return; }
+    if ((balance[type] ?? 0) < 1) { setBuyOpen(true); return; }
     setSendingGift(type);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${BACKEND}/api/live/${id}/gift`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ type, amount }),
+        body: JSON.stringify({ type, amount: 1 }),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? "Error al enviar el regalo"); return; }
@@ -463,7 +425,7 @@ export default function LivePage() {
     }
   };
 
-  const buyGift = async (type: string, quantity = 10) => {
+  const buyGift = async (type: string) => {
     if (buying) return;
     setBuying(type);
     try {
@@ -471,7 +433,7 @@ export default function LivePage() {
       const res = await fetch(`${BACKEND}/api/live/gifts/buy`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ type, quantity }),
+        body: JSON.stringify({ type, quantity: 10 }),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? "Error al comprar"); return; }
@@ -490,11 +452,15 @@ export default function LivePage() {
     setMicOn(t.enabled);
   };
 
+  // Al apagar/prender cámara, también lo emitimos para que los viewers
+  // vean el placeholder "Cámara apagada"
   const toggleCam = () => {
     const t = localStreamRef.current?.getVideoTracks()[0];
     if (!t) return;
     t.enabled = !t.enabled;
     setCamOn(t.enabled);
+    // Notificar a todos los viewers
+    socketRef.current?.emit("live:camState", { liveId: id, on: t.enabled });
   };
 
   const endLive = async () => {
@@ -518,8 +484,20 @@ export default function LivePage() {
     }
   };
 
-  const streamerName =
-    typeof live?.user === "object" ? live.user?.name ?? "Streamer" : "Streamer";
+  // ── Escenario: invitar / quitar ───────────────────────────────────────────
+  const inviteToStage = (viewer: { name: string; socketId?: string }) => {
+    if (!viewer.socketId) return;
+    const newParticipant: StageParticipant = { socketId: viewer.socketId, name: viewer.name };
+    const updated = [...stageParticipants, newParticipant];
+    setStageParticipants(updated);
+    socketRef.current?.emit("live:stageUpdate", { liveId: id, participants: updated });
+  };
+
+  const removeFromStage = (socketId: string) => {
+    const updated = stageParticipants.filter((p) => p.socketId !== socketId);
+    setStageParticipants(updated);
+    socketRef.current?.emit("live:stageUpdate", { liveId: id, participants: updated });
+  };
 
   // ── Renders condicionales ─────────────────────────────────────────────────
   if (loading)
@@ -549,7 +527,7 @@ export default function LivePage() {
       </div>
     );
 
-  const status: LiveStatus = live.status;
+  const status = live.status;
 
   // ── Vista principal ───────────────────────────────────────────────────────
   return (
@@ -570,28 +548,20 @@ export default function LivePage() {
           />
         )}
 
-        {/* Video remoto (viewer) */}
+        {/* Video remoto (viewer) — visible solo si está conectado Y cámara encendida */}
         {!isOwner && (
           <>
-            {/*
-              KEY FIX pantalla negra:
-              - playsInline: obligatorio en iOS para no fullscreen automático
-              - autoPlay: hint al browser, pero NO garantiza reproducción
-              - muted: empieza en mudo para bypassear autoplay policy de Chrome,
-                       lo removemos en ontrack una vez que play() resuelve
-              - El play() real lo maneja tryPlayRemote() en el evento ontrack del PC
-            */}
             <video
               ref={remoteVideoRef}
               autoPlay
               playsInline
               muted
               className="live-video-el"
-              style={{ display: connected ? "block" : "none" }}
+              style={{ display: (connected && camOn) ? "block" : "none" }}
             />
 
-            {/* Overlay "Tap para ver" cuando autoplay fue bloqueado */}
-            {connected && needsTap && (
+            {/* Tap para ver (autoplay bloqueado) */}
+            {connected && camOn && needsTap && (
               <button
                 onClick={() => autoPlayRetryRef.current?.()}
                 style={{
@@ -599,8 +569,7 @@ export default function LivePage() {
                   display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center", gap: 12,
                   background: "rgba(0,0,0,0.55)",
-                  border: "none", cursor: "pointer", zIndex: 10,
-                  color: "#fff",
+                  border: "none", cursor: "pointer", zIndex: 10, color: "#fff",
                 }}
               >
                 <div style={{
@@ -608,15 +577,22 @@ export default function LivePage() {
                   background: "rgba(255,255,255,0.15)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 28,
-                }}>
-                  ▶
-                </div>
+                }}>▶</div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>
                   Tocá para ver el stream
                 </span>
               </button>
             )}
 
+            {/* Cámara apagada — para todos los viewers */}
+            {connected && !camOn && (
+              <div className="live-video-placeholder">
+                <VideoOff size={40} strokeWidth={1} />
+                <span>Cámara apagada</span>
+              </div>
+            )}
+
+            {/* No conectado aún */}
             {!connected && (
               <div className="live-video-placeholder">
                 <Radio size={40} strokeWidth={1} />
@@ -626,6 +602,7 @@ export default function LivePage() {
           </>
         )}
 
+        {/* Owner: cámara apagada */}
         {isOwner && !camOn && (
           <div className="live-video-placeholder">
             <VideoOff size={40} strokeWidth={1} />
@@ -633,6 +610,7 @@ export default function LivePage() {
           </div>
         )}
 
+        {/* Badges */}
         {status === "live" && (
           <div className="live-badge-viewers">
             <span className="live-rec-dot" /> EN VIVO
@@ -646,6 +624,7 @@ export default function LivePage() {
           </div>
         )}
 
+        {/* Animación de gift */}
         {giftAnim && (
           <div className="live-gift-anim">
             <span className="live-gift-anim-emoji">{GIFT_EMOJIS[giftAnim.type] ?? "🎁"}</span>
@@ -658,6 +637,7 @@ export default function LivePage() {
           </div>
         )}
 
+        {/* Controles del owner */}
         {isOwner && (
           <div className="live-owner-controls">
             <button onClick={toggleMic} className={`live-ctrl-btn${micOn ? "" : " off"}`}>
@@ -716,8 +696,7 @@ export default function LivePage() {
               {viewerList.map((v, i) => (
                 <span key={i} style={{
                   fontSize: 11, background: "rgba(124,58,237,0.2)",
-                  color: "#c4b5fd", borderRadius: 10,
-                  padding: "2px 8px", fontWeight: 600,
+                  color: "#c4b5fd", borderRadius: 10, padding: "2px 8px", fontWeight: 600,
                 }}>
                   {v.name}
                 </span>
@@ -738,13 +717,22 @@ export default function LivePage() {
           </span>
         </div>
 
+        {/* Panel de escenario (solo owner) */}
+        {isOwner && status === "live" && (
+          <StagePanel
+            viewerList={viewerList}
+            stageParticipants={stageParticipants}
+            onInvite={inviteToStage}
+            onRemove={removeFromStage}
+          />
+        )}
+
         {/* Barra de compartir */}
         <div style={{
           padding: "7px 10px",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
           display: "flex", alignItems: "center", gap: 6,
         }}>
-          {/* Owner: toggle compartir */}
           {isOwner && (
             <button
               onClick={toggleShare}
@@ -765,8 +753,6 @@ export default function LivePage() {
               {shareEnabled ? "ON" : "OFF"}
             </button>
           )}
-
-          {/* Botón copiar enlace */}
           {(shareEnabled || isOwner) ? (
             <button
               onClick={copyLink}
@@ -787,77 +773,29 @@ export default function LivePage() {
           ) : (
             <span style={{
               flex: 1, fontSize: 11,
-              color: "rgba(255,255,255,0.25)", fontStyle: "italic",
-              textAlign: "center",
+              color: "rgba(255,255,255,0.25)", fontStyle: "italic", textAlign: "center",
             }}>
               Compartir deshabilitado
             </span>
           )}
         </div>
 
-        {/* Mensajes del chat */}
-        <div className="live-chat-messages">
-          {chat.length === 0 ? (
-            <p className="live-chat-empty">Sé el primero en comentar 👋</p>
-          ) : (
-            chat.map((m, i) => (
-              <div key={i} className="live-msg">
-                <span className="live-msg-user">{m.username}:</span>
-                <span className="live-msg-text">{m.message}</span>
-              </div>
-            ))
-          )}
-          <div ref={chatEndRef} />
-        </div>
+        {/* ── Chat messages (componente extraído) ────────────────────────── */}
+        <ChatMessages
+          chat={chat}
+          myUsername={myUsername}
+          ownerUsername={streamerName}
+        />
 
         {/* Gift picker */}
         {!isOwner && status === "live" && giftOpen && (
-          <div className="live-gift-picker">
-            <div className="live-gift-picker-header">
-              <span>Enviar regalo</span>
-              <button onClick={() => setGiftOpen(false)} aria-label="Cerrar">
-                <X size={16} strokeWidth={1.75} />
-              </button>
-            </div>
-            <div className="live-gift-grid">
-              {Object.entries(GIFT_EMOJIS).map(([type, emoji]) => {
-                const stock = balance[type] ?? 0;
-                const busy  = sendingGift === type;
-                return (
-                  <button
-                    key={type}
-                    className="live-gift-item"
-                    onClick={() => sendGift(type, 1)}
-                    disabled={busy}
-                    style={{ opacity: stock === 0 ? 0.45 : 1 }}
-                  >
-                    <span className="live-gift-emoji">{busy ? "⏳" : emoji}</span>
-                    <span className="live-gift-label">{GIFT_LABELS[type]}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, marginTop: 2,
-                      color: stock > 0 ? "#a3e635" : "#f87171",
-                    }}>
-                      x{stock}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => { setGiftOpen(false); setBuyOpen(true); }}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                width: "100%", marginTop: 10, padding: "8px 0",
-                background: "rgba(250,204,21,0.12)",
-                border: "1px solid rgba(250,204,21,0.3)",
-                borderRadius: 8, color: "#fbbf24",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              <ShoppingBag size={13} strokeWidth={2} />
-              Comprar más gifts
-            </button>
-          </div>
+          <GiftPicker
+            balance={balance}
+            sendingGift={sendingGift}
+            onSend={sendGift}
+            onClose={() => setGiftOpen(false)}
+            onOpenShop={() => { setGiftOpen(false); setBuyOpen(true); }}
+          />
         )}
 
         {/* Input de chat */}
@@ -894,80 +832,15 @@ export default function LivePage() {
 
       {/* ══ Modal tienda de gifts ════════════════════════════════════════════ */}
       {buyOpen && (
-        <div style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.75)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 200, padding: 16,
-        }}>
-          <div style={{
-            background: "#12121f",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 20, padding: 24,
-            width: "100%", maxWidth: 360,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>Tienda de gifts</p>
-                <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
-                  Comprá gifts para enviar en lives
-                </p>
-              </div>
-              <button
-                onClick={() => setBuyOpen(false)}
-                style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4 }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              {Object.entries(GIFT_EMOJIS).map(([type, emoji]) => {
-                const stock = balance[type] ?? 0;
-                const busy  = buying === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => buyGift(type, 10)}
-                    disabled={busy}
-                    style={{
-                      display: "flex", flexDirection: "column",
-                      alignItems: "center", gap: 4,
-                      padding: "12px 8px", borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: busy ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.06)",
-                      cursor: busy ? "not-allowed" : "pointer",
-                      transition: "background 0.15s", color: "#fff",
-                    }}
-                  >
-                    <span style={{ fontSize: 26 }}>{busy ? "⏳" : emoji}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600 }}>{GIFT_LABELS[type]}</span>
-                    <span style={{ fontSize: 10, color: stock > 0 ? "#a3e635" : "rgba(255,255,255,0.35)" }}>
-                      Tenés: {stock}
-                    </span>
-                    <span style={{
-                      fontSize: 10, marginTop: 2, padding: "2px 7px", borderRadius: 6,
-                      background: GIFT_PRICE[type] === "gratis"
-                        ? "rgba(163,230,53,0.15)" : "rgba(251,191,36,0.15)",
-                      color: GIFT_PRICE[type] === "gratis" ? "#a3e635" : "#fbbf24",
-                      fontWeight: 600,
-                    }}>
-                      {GIFT_PRICE[type] === "gratis" ? "+10 gratis" : `${GIFT_PRICE[type]} / 10`}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p style={{
-              fontSize: 10, color: "rgba(255,255,255,0.3)",
-              textAlign: "center", marginTop: 16, marginBottom: 0,
-            }}>
-              Los gifts "gratis" se suman sin costo. Los pagos reales requieren integrar un gateway de pagos.
-            </p>
-          </div>
-        </div>
+        <GiftShopModal
+          balance={balance}
+          buying={buying}
+          onBuy={buyGift}
+          onClose={() => setBuyOpen(false)}
+        />
       )}
 
-      {/* ── Estilos inline ─────────────────────────────────────────────────── */}
+      {/* ── Estilos inline mínimos (solo lo que no va en live.css) ─────────── */}
       <style>{`
         .live-end-btn {
           display: flex; align-items: center; gap: 6px;
@@ -987,16 +860,6 @@ export default function LivePage() {
           font-size: 14px; cursor: pointer; transition: background 0.18s;
         }
         .live-back-btn:hover { background: rgba(255,255,255,0.14); }
-
-        @keyframes giftPop {
-          0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.4); }
-          20%  { opacity: 1; transform: translate(-50%,-62%) scale(1.2); }
-          80%  { opacity: 1; transform: translate(-50%,-62%) scale(1);   }
-          100% { opacity: 0; transform: translate(-50%,-80%) scale(0.9); }
-        }
-        @keyframes live-blink {
-          0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
-        }
       `}</style>
     </div>
   );
