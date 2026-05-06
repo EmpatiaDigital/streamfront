@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useContext } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import {
   Mic, MicOff, Video, VideoOff, Square, Send, Gift,
-  X, Users, Radio, Clock, PhoneOff, Link, Link2Off,
+  Users, Radio, Clock, PhoneOff, Link, Link2Off,
 } from "lucide-react";
 import "./live.css";
 
-// Importamos todos los helpers / sub-componentes
+// AuthContext — username real del usuario logueado
+import { AuthContext } from "@/app/context/AuthContext";
+
+// Helpers / sub-componentes
 import {
   ChatMessages,
   GiftPicker,
   GiftShopModal,
   StagePanel,
-  StageGrid,          // ← nuevo componente visual
+  StageTilesRow,
   GIFT_EMOJIS,
   GIFT_LABELS,
   type ChatMsg,
@@ -23,6 +26,7 @@ import {
   type Balance,
   type ViewerInfo,
   type StageParticipant,
+  type StageTileStream,
 } from "./LiveHelpers";
 
 const BACKEND = "https://stream-72mw.onrender.com";
@@ -39,18 +43,19 @@ const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
     { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
   ],
 };
 
+/** Lee id y name del JWT almacenado — solo para determinar isOwner en el fetch inicial */
 function getStoredUser(): { id: string; name: string } {
   try {
     const token = localStorage.getItem("token");
     if (!token) return { id: "", name: "" };
     const payload = JSON.parse(atob(token.split(".")[1]));
     return {
-      id: String(payload?.id ?? payload?._id ?? ""),
+      id:   String(payload?.id   ?? payload?._id      ?? ""),
       name: String(payload?.name ?? payload?.username ?? ""),
     };
   } catch {
@@ -63,15 +68,20 @@ export default function LivePage() {
   const router = useRouter();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
+  // ── Username real desde AuthContext ───────────────────────────────────────
+  const authCtx    = useContext(AuthContext);
+  const myUsername = authCtx?.user?.name ?? authCtx?.user?.username ?? getStoredUser().name;
+
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const localVideoRef  = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const socketRef      = useRef<Socket | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const peerConnsRef   = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const peerConnRef    = useRef<RTCPeerConnection | null>(null);
-  const streamReadyRef = useRef(false);
-  const socketReadyRef = useRef(false);
+  const localVideoRef    = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef   = useRef<HTMLVideoElement>(null);
+  const socketRef        = useRef<Socket | null>(null);
+  const localStreamRef   = useRef<MediaStream | null>(null);
+  const peerConnsRef     = useRef<Map<string, RTCPeerConnection>>(new Map()); // streamer→viewers
+  const peerConnRef      = useRef<RTCPeerConnection | null>(null);            // viewer→streamer
+  const stagePCsRef      = useRef<Map<string, RTCPeerConnection>>(new Map()); // stage: socketId→PC
+  const streamReadyRef   = useRef(false);
+  const socketReadyRef   = useRef(false);
   const autoPlayRetryRef = useRef<(() => void) | null>(null);
 
   // ── Estado base ───────────────────────────────────────────────────────────
@@ -105,7 +115,10 @@ export default function LivePage() {
   const [sendingGift, setSendingGift] = useState<string | null>(null);
 
   // ── Estado del escenario ──────────────────────────────────────────────────
+  // stageParticipants: lista de quién está en el escenario (para StagePanel)
   const [stageParticipants, setStageParticipants] = useState<StageParticipant[]>([]);
+  // stageTiles: tiles con el MediaStream WebRTC real (para StageTilesRow)
+  const [stageTiles, setStageTiles] = useState<StageTileStream[]>([]);
 
   // ── URL para compartir ────────────────────────────────────────────────────
   const shareUrl = typeof window !== "undefined"
@@ -114,8 +127,6 @@ export default function LivePage() {
 
   const streamerName =
     typeof live?.user === "object" ? live.user?.name ?? "Streamer" : "Streamer";
-
-  const { name: myUsername } = getStoredUser();
 
   // ── Limpieza total ────────────────────────────────────────────────────────
   const fullCleanup = useCallback(() => {
@@ -129,6 +140,9 @@ export default function LivePage() {
     peerConnsRef.current.clear();
     peerConnRef.current?.close();
     peerConnRef.current = null;
+    // Limpiar PCs del escenario
+    stagePCsRef.current.forEach((pc) => pc.close());
+    stagePCsRef.current.clear();
     autoPlayRetryRef.current = null;
   }, []);
 
@@ -147,7 +161,7 @@ export default function LivePage() {
       });
   }, []);
 
-  // ── registerStreamer cuando ambos listos ──────────────────────────────────
+  // ── registerStreamer cuando stream y socket están listos ──────────────────
   const tryRegisterStreamer = useCallback(() => {
     if (!socketReadyRef.current || !streamReadyRef.current) return;
     if (!socketRef.current?.connected) return;
@@ -178,7 +192,7 @@ export default function LivePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // ── PASO 1b: Cargar balance de gifts ─────────────────────────────────────
+  // ── PASO 1b: Cargar balance de gifts (solo viewers) ───────────────────────
   useEffect(() => {
     if (isOwner === null || isOwner === true) return;
     const token = localStorage.getItem("token");
@@ -190,7 +204,7 @@ export default function LivePage() {
       .catch(() => {});
   }, [isOwner]);
 
-  // ── Crear PeerConnection streamer → viewer ────────────────────────────────
+  // ── Crear PeerConnection streamer → viewer (WebRTC principal) ─────────────
   const createStreamerPC = useCallback(
     (viewerSocketId: string, stream: MediaStream): RTCPeerConnection => {
       peerConnsRef.current.get(viewerSocketId)?.close();
@@ -221,6 +235,7 @@ export default function LivePage() {
     });
     socketRef.current = s;
 
+    // ── Conexión ────────────────────────────────────────────────────────────
     s.on("connect", () => {
       socketReadyRef.current = true;
       s.emit("live:join", { liveId: id });
@@ -233,6 +248,7 @@ export default function LivePage() {
 
     s.on("disconnect", () => { socketReadyRef.current = false; });
 
+    // ── Eventos generales ───────────────────────────────────────────────────
     s.on("live:chat",        (m: ChatMsg) => setChat((p) => [...p.slice(-199), m]));
     s.on("live:viewerCount", ({ count }: { count: number }) => setViewers(count));
     s.on("live:viewerList",  ({ viewers: vl }: { viewers: ViewerInfo[] }) => setViewerList(vl));
@@ -243,17 +259,25 @@ export default function LivePage() {
       setGiftAnim(g);
       setTimeout(() => setGiftAnim(null), 3500);
     });
+
     s.on("live:ended", () => {
       fullCleanup();
       setLive((p) => (p ? { ...p, status: "ended" } : p));
     });
 
-    // ── Escenario: recibir actualización ──────────────────────────────────
+    // Actualización del escenario (desde el servidor tras stage:answer)
     s.on("live:stageUpdate", ({ participants }: { participants: StageParticipant[] }) => {
       setStageParticipants(participants);
+      // Limpiar tiles de participantes que ya no están en el escenario
+      setStageTiles((prev) => {
+        const ids = new Set(participants.map((p) => p.socketId));
+        return prev.filter((t) => ids.has(t.socketId));
+      });
     });
 
-    // Streamer recibe viewer nuevo
+    // ── WebRTC principal: streamer → viewer ─────────────────────────────────
+
+    // Streamer: llega un nuevo viewer
     s.on("webrtc:newViewer", async ({ viewerSocketId }: { viewerSocketId: string }) => {
       if (!isOwner || !localStreamRef.current) return;
       const pc    = createStreamerPC(viewerSocketId, localStreamRef.current);
@@ -262,7 +286,7 @@ export default function LivePage() {
       s.emit("webrtc:offer", { targetSocketId: viewerSocketId, sdp: offer });
     });
 
-    // Viewer recibe oferta
+    // Viewer: recibe oferta del streamer
     s.on("webrtc:offer", async ({
       streamerSocketId, sdp,
     }: { streamerSocketId: string; sdp: RTCSessionDescriptionInit }) => {
@@ -315,7 +339,7 @@ export default function LivePage() {
       s.emit("webrtc:answer", { targetSocketId: streamerSocketId, sdp: answer });
     });
 
-    // Streamer recibe answer
+    // Streamer: recibe answer del viewer
     s.on("webrtc:answer", async ({
       viewerSocketId, sdp,
     }: { viewerSocketId: string; sdp: RTCSessionDescriptionInit }) => {
@@ -325,7 +349,7 @@ export default function LivePage() {
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
     });
 
-    // ICE candidates
+    // ICE candidates del stream principal
     s.on("webrtc:ice", async ({
       fromSocketId, candidate,
     }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
@@ -338,17 +362,151 @@ export default function LivePage() {
             await peerConnRef.current.addIceCandidate(new RTCIceCandidate(candidate));
         }
       } catch (e) {
-        console.warn("⚠️ ICE error:", e);
+        console.warn("⚠️ webrtc:ice error:", e);
       }
     });
 
+    // ── WebRTC del escenario (stage) ────────────────────────────────────────
+
+    /**
+     * VIEWER: el owner lo invitó al escenario.
+     * Abre su cámara y envía una oferta SDP al owner.
+     */
+    s.on("stage:invited", async ({
+      ownerSocketId,
+    }: { ownerSocketId: string; liveId: string }) => {
+      if (isOwner) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+        // Crear PC para enviar el stream al owner
+        stagePCsRef.current.get("owner")?.close();
+        const pc = new RTCPeerConnection(RTC_CONFIG);
+        stagePCsRef.current.set("owner", pc);
+
+        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+
+        pc.onicecandidate = ({ candidate }) => {
+          if (candidate)
+            s.emit("stage:ice", { targetSocketId: ownerSocketId, candidate });
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+            stagePCsRef.current.delete("owner");
+          }
+        };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        s.emit("stage:offer", {
+          targetSocketId: ownerSocketId,
+          fromName: myUsername,
+          sdp: offer,
+        });
+      } catch (err) {
+        console.warn("⚠️ stage:invited — no se pudo acceder a la cámara:", err);
+      }
+    });
+
+    /**
+     * OWNER: recibe la oferta SDP del viewer invitado.
+     * Crea un PC para recibir su stream y lo muestra en un StageTile.
+     */
+    s.on("stage:offer", async ({
+      fromSocketId,
+      fromName,
+      sdp,
+    }: { fromSocketId: string; fromName: string; sdp: RTCSessionDescriptionInit }) => {
+      if (!isOwner) return;
+
+      stagePCsRef.current.get(fromSocketId)?.close();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      stagePCsRef.current.set(fromSocketId, pc);
+
+      pc.ontrack = (e) => {
+        const stream = e.streams[0];
+        if (!stream) return;
+        setStageTiles((prev) => {
+          const exists = prev.find((t) => t.socketId === fromSocketId);
+          if (exists) {
+            return prev.map((t) =>
+              t.socketId === fromSocketId ? { ...t, stream } : t
+            );
+          }
+          return [...prev, { socketId: fromSocketId, name: fromName, stream }];
+        });
+      };
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate)
+          s.emit("stage:ice", { targetSocketId: fromSocketId, candidate });
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+          stagePCsRef.current.delete(fromSocketId);
+          setStageTiles((prev) => prev.filter((t) => t.socketId !== fromSocketId));
+        }
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      s.emit("stage:answer", { targetSocketId: fromSocketId, sdp: answer });
+    });
+
+    /**
+     * VIEWER: recibe la respuesta SDP del owner — completa la negociación.
+     */
+    s.on("stage:answer", async ({
+      sdp,
+    }: { sdp: RTCSessionDescriptionInit }) => {
+      if (isOwner) return;
+      const pc = stagePCsRef.current.get("owner");
+      if (!pc || pc.signalingState !== "have-local-offer") return;
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    });
+
+    /**
+     * ICE candidates del escenario — relay punto a punto.
+     */
+    s.on("stage:ice", async ({
+      fromSocketId,
+      candidate,
+    }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
+      try {
+        if (isOwner) {
+          const pc = stagePCsRef.current.get(fromSocketId);
+          if (pc?.remoteDescription)
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } else {
+          const pc = stagePCsRef.current.get("owner");
+          if (pc?.remoteDescription)
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (e) {
+        console.warn("⚠️ stage:ice error:", e);
+      }
+    });
+
+    /**
+     * VIEWER: el owner lo quitó del escenario.
+     */
+    s.on("stage:removed", () => {
+      const pc = stagePCsRef.current.get("owner");
+      pc?.close();
+      stagePCsRef.current.delete("owner");
+    });
+
+    // ── Cleanup del efecto ──────────────────────────────────────────────────
     return () => {
       s.emit("live:leave", { liveId: id });
       s.disconnect();
-      socketRef.current  = null;
+      socketRef.current      = null;
       socketReadyRef.current = false;
     };
-  }, [id, isOwner, createStreamerPC, fullCleanup, tryRegisterStreamer, tryPlayRemote]);
+  }, [id, isOwner, createStreamerPC, fullCleanup, tryRegisterStreamer, tryPlayRemote, myUsername]);
 
   // ── Cámara del streamer ───────────────────────────────────────────────────
   useEffect(() => {
@@ -374,8 +532,11 @@ export default function LivePage() {
   // ── Acciones ──────────────────────────────────────────────────────────────
   const sendChat = () => {
     if (!msg.trim() || !id) return;
-    const { name } = getStoredUser();
-    socketRef.current?.emit("live:chat", { liveId: id, message: msg, username: name });
+    socketRef.current?.emit("live:chat", {
+      liveId: id,
+      message: msg,
+      username: myUsername, // el servidor usa socket.data.username, esto es fallback
+    });
     setMsg("");
   };
 
@@ -468,7 +629,7 @@ export default function LivePage() {
         method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
       socketRef.current?.emit("live:ownerEnd", { liveId: id });
-      socketRef.current?.emit("live:leave", { liveId: id });
+      socketRef.current?.emit("live:leave",    { liveId: id });
       socketRef.current?.disconnect();
       socketRef.current = null;
       setLive((p) => (p ? { ...p, status: "ended" } : p));
@@ -478,19 +639,26 @@ export default function LivePage() {
     }
   };
 
-  // ── Escenario: invitar / quitar ───────────────────────────────────────────
-  const inviteToStage = (viewer: { name: string; socketId?: string }) => {
+  // ── Escenario: invitar viewer ─────────────────────────────────────────────
+  const inviteToStage = (viewer: ViewerInfo) => {
     if (!viewer.socketId) return;
-    const newParticipant: StageParticipant = { socketId: viewer.socketId, name: viewer.name };
-    const updated = [...stageParticipants, newParticipant];
-    setStageParticipants(updated);
-    socketRef.current?.emit("live:stageUpdate", { liveId: id, participants: updated });
+    // El servidor enviará stage:invited al viewer y luego actualizará stageParticipants
+    // via live:stageUpdate cuando reciba el stage:answer
+    socketRef.current?.emit("stage:invite", {
+      liveId: id,
+      targetSocketId: viewer.socketId,
+    });
   };
 
+  // ── Escenario: quitar participante ────────────────────────────────────────
   const removeFromStage = (socketId: string) => {
-    const updated = stageParticipants.filter((p) => p.socketId !== socketId);
-    setStageParticipants(updated);
-    socketRef.current?.emit("live:stageUpdate", { liveId: id, participants: updated });
+    // Cerrar y eliminar el PC del escenario
+    stagePCsRef.current.get(socketId)?.close();
+    stagePCsRef.current.delete(socketId);
+    // Quitar el tile localmente
+    setStageTiles((prev) => prev.filter((t) => t.socketId !== socketId));
+    // Notificar al servidor
+    socketRef.current?.emit("stage:remove", { liveId: id, targetSocketId: socketId });
   };
 
   // ── Renders condicionales ─────────────────────────────────────────────────
@@ -530,7 +698,7 @@ export default function LivePage() {
       {/* ══ Área de video ═══════════════════════════════════════════════════ */}
       <div className="live-video-area">
 
-        {/* Video del streamer (owner) */}
+        {/* Video local del streamer (owner) */}
         {isOwner && (
           <video
             ref={localVideoRef}
@@ -554,6 +722,7 @@ export default function LivePage() {
               style={{ display: (connected && camOn) ? "block" : "none" }}
             />
 
+            {/* Tap para activar autoplay */}
             {connected && camOn && needsTap && (
               <button
                 onClick={() => autoPlayRetryRef.current?.()}
@@ -593,7 +762,7 @@ export default function LivePage() {
           </>
         )}
 
-        {/* Owner: cámara apagada */}
+        {/* Owner: placeholder cámara apagada */}
         {isOwner && !camOn && (
           <div className="live-video-placeholder">
             <VideoOff size={40} strokeWidth={1} />
@@ -601,16 +770,13 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* ── Grilla de participantes del escenario ─────────────────────────
-            Visible para TODOS (owner y viewers) cuando hay participantes     */}
-        {stageParticipants.length > 0 && (
-          <StageGrid
-            participants={stageParticipants}
-            streamerName={streamerName}
-            isOwner={!!isOwner}
-            onRemove={removeFromStage}
-          />
-        )}
+        {/* ── Tiles del escenario (estilo TikTok Live) ──────────────────────
+            Visibles para TODOS cuando hay participantes con video WebRTC real */}
+        <StageTilesRow
+          tiles={stageTiles}
+          isOwner={!!isOwner}
+          onRemove={removeFromStage}
+        />
 
         {/* Badges */}
         {status === "live" && (
@@ -639,7 +805,7 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Controles del owner */}
+        {/* Controles del owner (mic / cam) */}
         {isOwner && (
           <div className="live-owner-controls">
             <button onClick={toggleMic} className={`live-ctrl-btn${micOn ? "" : " off"}`}>
@@ -719,7 +885,7 @@ export default function LivePage() {
           </span>
         </div>
 
-        {/* Panel de escenario (solo owner) */}
+        {/* Panel de escenario — solo visible para el owner cuando el live está activo */}
         {isOwner && status === "live" && (
           <StagePanel
             viewerList={viewerList}
@@ -782,7 +948,7 @@ export default function LivePage() {
           )}
         </div>
 
-        {/* ── Chat messages ─────────────────────────────────────────────── */}
+        {/* ── Chat messages ─────────────────────────────────────────────────── */}
         <ChatMessages
           chat={chat}
           myUsername={myUsername}
