@@ -10,12 +10,12 @@ import {
 import "./live.css";
 
 import { AuthContext } from "../../context/AuthContext";
-import { BgPicker } from "../../ver/[id]/BgPicker";
 
 import {
   ChatMessages,
   GiftPicker,
   GiftShopModal,
+   BgPicker,
   StagePanel,
   StageSelfControls,
   GIFT_EMOJIS,
