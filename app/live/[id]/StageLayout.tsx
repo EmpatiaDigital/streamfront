@@ -4,6 +4,7 @@
  * StageLayout.tsx
  */
 
+
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, X, Star, StarOff } from "lucide-react";
 import "./stage-layout.css";
