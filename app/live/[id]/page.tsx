@@ -460,13 +460,23 @@ export default function LivePage() {
       const pc = new RTCPeerConnection(RTC_CONFIG);
       stagePCsRef.current.set(fromSocketId, pc);
 
+      // ── CRÍTICO: el owner agrega su propio stream al PC del invitado ──
+      // Sin esto la conexión es unidireccional: el viewer envía audio/video
+      // al owner pero nunca recibe nada de vuelta, por lo que el owner no
+      // escucha al invitado Y el invitado no puede escuchar al owner
+      // a través del canal del escenario.
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => {
+          pc.addTrack(t, localStreamRef.current!);
+        });
+      }
+
       pc.ontrack = (e) => {
         const stream = e.streams[0];
         if (!stream) return;
         setStageTiles((prev) => {
           const exists = prev.find((t) => t.socketId === fromSocketId);
           if (exists) return prev.map((t) => t.socketId === fromSocketId ? { ...t, stream } : t);
-          // Nombre viene del servidor (fromName fue validado server-side desde el JWT)
           return [...prev, { socketId: fromSocketId, name: fromName, stream }];
         });
       };
@@ -487,11 +497,26 @@ export default function LivePage() {
       s.emit("stage:answer", { targetSocketId: fromSocketId, sdp: answer });
     });
 
-    s.on("stage:answer", async ({ sdp }: { sdp: RTCSessionDescriptionInit }) => {
-      if (isOwner) return;
-      const pc = stagePCsRef.current.get("owner");
-      if (!pc || pc.signalingState !== "have-local-offer") return;
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    // stage:answer puede llegar tanto al viewer (respuesta del owner al offer
+    // que hizo el viewer) como al owner si en el futuro se renegocia.
+    // El campo fromSocketId identifica quién envió el answer para hacer
+    // el routing correcto en el mapa stagePCsRef.
+    s.on("stage:answer", async ({
+      sdp, fromSocketId,
+    }: { sdp: RTCSessionDescriptionInit; fromSocketId?: string }) => {
+      // Viewer: busca el PC con key "owner"
+      if (!isOwner && !isAdmin) {
+        const pc = stagePCsRef.current.get("owner");
+        if (!pc || pc.signalingState !== "have-local-offer") return;
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        return;
+      }
+      // Owner/admin: busca el PC del viewer que respondió
+      if (fromSocketId) {
+        const pc = stagePCsRef.current.get(fromSocketId);
+        if (!pc || pc.signalingState !== "have-local-offer") return;
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      }
     });
 
     s.on("stage:ice", async ({
