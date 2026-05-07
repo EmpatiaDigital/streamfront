@@ -10,8 +10,8 @@ import {
 import "./live.css";
 
 import { AuthContext } from "../../context/AuthContext";
+import { BgPicker } from "../../ver/[id]/BgPicker";
 
-import { BgPicker } from "./BgPicker";
 import {
   ChatMessages,
   GiftPicker,
