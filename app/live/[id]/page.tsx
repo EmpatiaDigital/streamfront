@@ -73,7 +73,7 @@ export default function LivePage() {
   authCtx?.user?.name?.trim() ||
   authCtx?.user?.username?.trim() ||
   getStoredUser().name ||
-  "Usuario";
+  "";
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const localVideoRef    = useRef<HTMLVideoElement>(null);
@@ -247,16 +247,20 @@ export default function LivePage() {
     const s = io(BACKEND, { auth: { token }, reconnectionDelay: 1000, reconnectionAttempts: 5 });
     socketRef.current = s;
 
-    s.on("connect", () => {
-      socketReadyRef.current = true;
-      mySocketIdRef.current  = s.id ?? "";
-      s.emit("live:join", { liveId: id });
-      if (isOwner) {
-        tryRegisterStreamer();
-      } else {
-        s.emit("webrtc:viewerReady", { liveId: id });
-      }
-    });
+  s.on("connect", () => {
+  socketReadyRef.current = true;
+  mySocketIdRef.current  = s.id ?? "";
+  const name =
+    authCtx?.user?.name?.trim() ||
+    authCtx?.user?.username?.trim() ||
+    getStoredUser().name;
+  s.emit("live:join", { liveId: id, username: name }); // ← agregá username
+  if (isOwner) {
+    tryRegisterStreamer();
+  } else {
+    s.emit("webrtc:viewerReady", { liveId: id });
+  }
+});
     s.on("disconnect", () => { socketReadyRef.current = false; });
 
     // ── Eventos generales ─────────────────────────────────────────────────
