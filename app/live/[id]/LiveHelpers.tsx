@@ -3,7 +3,6 @@
 /**
  * LiveHelpers.tsx — sub-componentes de LivePage.
  */
-
 import { useEffect, useRef, useState } from "react";
 import {
   Mic, MicOff, Video, VideoOff, X,
