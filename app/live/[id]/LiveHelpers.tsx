@@ -282,7 +282,9 @@ export function StagePanel({
               {stageParticipants.map((p) => (
                 <div key={p.socketId} className="live-stage-slot">
                   <span className="live-stage-slot-dot" />
-                  <span className="live-stage-slot-name">{p.name}</span>
+                  <span className="live-stage-slot-name">
+  {p.name?.trim() || "Invitado"}
+</span>
                   <div className="live-stage-slot-controls">
                     {onMuteMic && (
                       <button
@@ -338,7 +340,9 @@ export function StagePanel({
                 const isAdm = adminList.includes(v.socketId!);
                 return (
                   <div key={v.socketId} className="live-stage-admin-row">
-                    <span className="live-stage-admin-name">{v.name}</span>
+                    <span className="live-stage-admin-name">
+  {v.name?.trim() || "Viewer"}
+</span>
                     <button
                       className={`live-stage-admin-btn${isAdm ? " active" : ""}`}
                       onClick={() => onSetAdmin?.(v.socketId!, !isAdm)}
