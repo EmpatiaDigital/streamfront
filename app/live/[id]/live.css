@@ -589,3 +589,45 @@
   }
   .live-stream-info { display: flex; flex-direction: column; }
 }
+/* ── BgPicker: no se corte en el borde derecho ──────────────────── */
+/* Asumiendo que BgPicker tiene una clase como .bg-picker o similar  */
+/* Ajustá el selector al que uses en BgPicker.tsx                    */
+.bg-picker {
+  position: absolute;
+  top: 14px;
+  right: 14px;           /* antes probablemente era left o sin posición */
+  z-index: 15;
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+}
+
+/* Si el label/texto del picker se corta, forzá que no desborde */
+.bg-picker button,
+.bg-picker span,
+.bg-picker label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── Nombre en tiles del escenario (stage-layout.css) ───────────── */
+.stage-tile-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;        /* era inline, no respetaba el max-width */
+}
+
+/* ── Nombre en mensajes del chat ────────────────────────────────── */
+/* Si ChatMessages renderiza el username con una clase tipo .chat-msg-user */
+.chat-msg-user {
+  font-weight: 700;
+  color: var(--accent-light);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
