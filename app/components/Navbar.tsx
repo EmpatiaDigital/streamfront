@@ -177,7 +177,7 @@ export default function Navbar() {
       <nav className="navbar">
         <div className="nav-logo" onClick={() => navigate("/")}>
           <img src="/images/preview.png" alt="TalentStream logo" className="nav-logo-img" />
-          <span className="nav-brand">TalentStream</span>
+          <span className="nav-brand">TalentStreaming</span>
         </div>
 
         <div className="nav-links">
