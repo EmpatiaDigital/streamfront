@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * LiveHelpers.tsx
- *
- * Sub-componentes y tipos compartidos por LivePage.
- * Importa "./helpers.css" para sus propios estilos.
+ * LiveHelpers.tsx — sub-componentes de LivePage.
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, X, ShoppingBag, ChevronDown, Shield, ShieldOff } from "lucide-react";
+import {
+  Mic, MicOff, Video, VideoOff, X,
+  ShoppingBag, ChevronDown, Shield, ShieldOff,
+} from "lucide-react";
 import "./helpers.css";
 
 /* ═══════════════════════════════════════════════════════════════
    TIPOS
-   ═══════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════════════════════════ */
 export type ChatMsg = {
   username: string;
   message:  string;
@@ -35,29 +35,65 @@ export type ViewerInfo = {
 };
 
 export type StageParticipant = {
-  socketId:  string;
-  name:      string;
-  micMuted?: boolean;
-  camOff?:   boolean;
-  /** El owner bloqueó el control de mic (el invitado no puede reactivarlo) */
+  socketId:   string;
+  name:       string;
+  micMuted?:  boolean;
+  camOff?:    boolean;
   micLocked?: boolean;
-  /** El owner bloqueó el control de cam */
   camLocked?: boolean;
 };
 
 export type StageTileStream = {
-  socketId:  string;
-  name:      string;
-  stream:    MediaStream;
-  micMuted?: boolean;
-  camOff?:   boolean;
+  socketId:   string;
+  name:       string;
+  stream:     MediaStream;
+  micMuted?:  boolean;
+  camOff?:    boolean;
   micLocked?: boolean;
   camLocked?: boolean;
 };
 
 /* ═══════════════════════════════════════════════════════════════
+   COLORES DE FONDO
+═══════════════════════════════════════════════════════════════ */
+export const BG_OPTIONS = [
+  { label: "Negro",       value: "#000000" },
+  { label: "Azul",        value: "#1a237e" },
+  { label: "Celeste",     value: "#0288d1" },
+  { label: "Verde claro", value: "#2e7d32" },
+  { label: "Beige",       value: "#d7ccc8" },
+  { label: "Gris oscuro", value: "#263238" },
+  { label: "Violeta",     value: "#4a148c" },
+  { label: "Rosa suave",  value: "#880e4f" },
+];
+
+interface BgPickerProps {
+  current: string;
+  onChange: (color: string) => void;
+}
+
+export function BgPicker({ current, onChange }: BgPickerProps) {
+  return (
+    <div className="live-bg-picker">
+      <span className="live-bg-picker-label">🎨 Fondo</span>
+      <div className="live-bg-swatches">
+        {BG_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            className={`live-bg-swatch${current === o.value ? " active" : ""}`}
+            style={{ background: o.value }}
+            title={o.label}
+            onClick={() => onChange(o.value)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CONSTANTES DE GIFTS
-   ═══════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════════════════════════ */
 export const GIFT_EMOJIS: Record<string, string> = {
   corazon:  "❤️",
   estrella: "⭐",
@@ -80,7 +116,7 @@ const GIFT_TYPES = Object.keys(GIFT_EMOJIS);
 
 /* ═══════════════════════════════════════════════════════════════
    CHAT MESSAGES
-   ═══════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════════════════════════ */
 interface ChatMessagesProps {
   chat:          ChatMsg[];
   myUsername:    string;
@@ -125,7 +161,7 @@ export function ChatMessages({ chat, myUsername, ownerUsername }: ChatMessagesPr
 
 /* ═══════════════════════════════════════════════════════════════
    GIFT PICKER
-   ═══════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════════════════════════ */
 interface GiftPickerProps {
   balance:      Balance;
   sendingGift:  string | null;
@@ -139,9 +175,7 @@ export function GiftPicker({ balance, sendingGift, onSend, onClose, onOpenShop }
     <div className="live-gift-picker">
       <div className="live-gift-picker-header">
         <span>🎁 Enviar regalo</span>
-        <button onClick={onClose} aria-label="Cerrar">
-          <X size={15} strokeWidth={2} />
-        </button>
+        <button onClick={onClose} aria-label="Cerrar"><X size={15} strokeWidth={2} /></button>
       </div>
       <div className="live-gift-grid">
         {GIFT_TYPES.map((type) => (
@@ -170,7 +204,7 @@ export function GiftPicker({ balance, sendingGift, onSend, onClose, onOpenShop }
 
 /* ═══════════════════════════════════════════════════════════════
    GIFT SHOP MODAL
-   ═══════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════════════════════════ */
 interface GiftShopModalProps {
   balance: Balance;
   buying:  string | null;
@@ -184,7 +218,7 @@ export function GiftShopModal({ balance, buying, onBuy, onClose }: GiftShopModal
       <div className="live-shop-modal" onClick={(e) => e.stopPropagation()}>
         <div className="live-shop-header">
           <span className="live-shop-title">🛍️ Tienda de regalos</span>
-          <button className="live-shop-close" onClick={onClose} aria-label="Cerrar">✕</button>
+          <button className="live-shop-close" onClick={onClose}>✕</button>
         </div>
         <div className="live-shop-grid">
           {GIFT_TYPES.map((type) => (
@@ -206,8 +240,8 @@ export function GiftShopModal({ balance, buying, onBuy, onClose }: GiftShopModal
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STAGE PANEL  (sidebar del owner / admin)
-   ═══════════════════════════════════════════════════════════════ */
+   STAGE PANEL — sidebar del owner / admin
+═══════════════════════════════════════════════════════════════ */
 interface StagePanelProps {
   viewerList:        ViewerInfo[];
   stageParticipants: StageParticipant[];
@@ -215,7 +249,6 @@ interface StagePanelProps {
   onRemove:          (socketId: string) => void;
   onMuteMic?:        (socketId: string, mute: boolean, lock: boolean) => void;
   onMuteCam?:        (socketId: string, off: boolean, lock: boolean) => void;
-  /** Solo el owner puede designar admins */
   isOwner?:          boolean;
   adminList?:        string[];
   onSetAdmin?:       (socketId: string, isAdmin: boolean) => void;
@@ -233,21 +266,14 @@ export function StagePanel({
   onSetAdmin,
 }: StagePanelProps) {
   const [open, setOpen] = useState(true);
-
   const stageIds  = new Set(stageParticipants.map((p) => p.socketId));
   const available = viewerList.filter((v) => v.socketId && !stageIds.has(v.socketId));
 
   return (
     <div className="live-stage-panel">
       <div className="live-stage-panel-header" onClick={() => setOpen((v) => !v)}>
-        <span className="live-stage-panel-title">
-          🎬 Escenario ({stageParticipants.length})
-        </span>
-        <ChevronDown
-          size={13}
-          strokeWidth={2.5}
-          className={`live-stage-panel-toggle${open ? " open" : ""}`}
-        />
+        <span className="live-stage-panel-title">🎬 Escenario ({stageParticipants.length})</span>
+        <ChevronDown size={13} strokeWidth={2.5} className={`live-stage-panel-toggle${open ? " open" : ""}`} />
       </div>
 
       {open && (
@@ -257,51 +283,30 @@ export function StagePanel({
               {stageParticipants.map((p) => (
                 <div key={p.socketId} className="live-stage-slot">
                   <span className="live-stage-slot-dot" />
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.name}
-                  </span>
+                  <span className="live-stage-slot-name">{p.name}</span>
                   <div className="live-stage-slot-controls">
-                    {/* Mic — doble clic = bloquear */}
                     {onMuteMic && (
                       <button
-                        className={`live-stage-slot-ctrl mute${p.micMuted ? " active" : ""}${p.micLocked ? " locked" : ""}`}
+                        className={`live-stage-slot-ctrl${p.micMuted ? " active" : ""}${p.micLocked ? " locked" : ""}`}
                         onClick={() => onMuteMic(p.socketId, !p.micMuted, p.micLocked ?? false)}
-                        onDoubleClick={() => onMuteMic(p.socketId, true, !(p.micLocked ?? false))}
-                        title={
-                          p.micLocked
-                            ? "Mic bloqueado (doble clic para desbloquear)"
-                            : p.micMuted
-                              ? "Activar mic (doble clic para bloquear)"
-                              : "Silenciar mic (doble clic para bloquear)"
-                        }
+                        onDoubleClick={(e) => { e.preventDefault(); onMuteMic(p.socketId, true, !(p.micLocked ?? false)); }}
+                        title={p.micLocked ? "Mic bloqueado (doble clic para desbloquear)" : p.micMuted ? "Activar mic" : "Silenciar mic (doble clic = bloquear)"}
                       >
-                        {p.micLocked ? "🔒" : p.micMuted ? "🔇" : "🎤"}
+                        {p.micLocked ? "🔒" : p.micMuted ? <MicOff size={10} /> : <Mic size={10} />}
                       </button>
                     )}
-                    {/* Cam */}
                     {onMuteCam && (
                       <button
-                        className={`live-stage-slot-ctrl cam${p.camOff ? " active" : ""}${p.camLocked ? " locked" : ""}`}
+                        className={`live-stage-slot-ctrl${p.camOff ? " active" : ""}${p.camLocked ? " locked" : ""}`}
                         onClick={() => onMuteCam(p.socketId, !p.camOff, p.camLocked ?? false)}
-                        onDoubleClick={() => onMuteCam(p.socketId, true, !(p.camLocked ?? false))}
-                        title={
-                          p.camLocked
-                            ? "Cam bloqueada (doble clic para desbloquear)"
-                            : p.camOff
-                              ? "Activar cámara (doble clic para bloquear)"
-                              : "Apagar cámara (doble clic para bloquear)"
-                        }
+                        onDoubleClick={(e) => { e.preventDefault(); onMuteCam(p.socketId, true, !(p.camLocked ?? false)); }}
+                        title={p.camLocked ? "Cam bloqueada (doble clic para desbloquear)" : p.camOff ? "Activar cámara" : "Apagar cámara (doble clic = bloquear)"}
                       >
-                        {p.camLocked ? "🔒" : p.camOff ? "🚫" : "📷"}
+                        {p.camLocked ? "🔒" : p.camOff ? <VideoOff size={10} /> : <Video size={10} />}
                       </button>
                     )}
-                    {/* Kick */}
-                    <button
-                      className="live-stage-slot-ctrl kick"
-                      onClick={() => onRemove(p.socketId)}
-                      title="Quitar del escenario"
-                    >
-                      ✕
+                    <button className="live-stage-slot-ctrl kick" onClick={() => onRemove(p.socketId)} title="Quitar">
+                      <X size={10} />
                     </button>
                   </div>
                 </div>
@@ -309,7 +314,6 @@ export function StagePanel({
             </div>
           )}
 
-          {/* Selector de invitados */}
           {available.length > 0 && (
             <div className="live-stage-add-row">
               <select
@@ -328,30 +332,23 @@ export function StagePanel({
             </div>
           )}
 
-          {/* Designar admin (solo owner) */}
           {isOwner && viewerList.length > 0 && (
             <div className="live-stage-admin-section">
               <p className="live-stage-admin-label">👮 Admins del live</p>
-              {viewerList
-                .filter((v) => v.socketId)
-                .map((v) => {
-                  const isAdm = adminList.includes(v.socketId!);
-                  return (
-                    <div key={v.socketId} className="live-stage-admin-row">
-                      <span className="live-stage-admin-name">{v.name}</span>
-                      <button
-                        className={`live-stage-admin-btn${isAdm ? " active" : ""}`}
-                        onClick={() => onSetAdmin?.(v.socketId!, !isAdm)}
-                        title={isAdm ? "Quitar admin" : "Designar como admin"}
-                      >
-                        {isAdm
-                          ? <><ShieldOff size={10} strokeWidth={2} /> Quitar</>
-                          : <><Shield size={10} strokeWidth={2} /> Admin</>
-                        }
-                      </button>
-                    </div>
-                  );
-                })}
+              {viewerList.filter((v) => v.socketId).map((v) => {
+                const isAdm = adminList.includes(v.socketId!);
+                return (
+                  <div key={v.socketId} className="live-stage-admin-row">
+                    <span className="live-stage-admin-name">{v.name}</span>
+                    <button
+                      className={`live-stage-admin-btn${isAdm ? " active" : ""}`}
+                      onClick={() => onSetAdmin?.(v.socketId!, !isAdm)}
+                    >
+                      {isAdm ? <><ShieldOff size={10} /> Quitar</> : <><Shield size={10} /> Admin</>}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -367,106 +364,151 @@ export function StagePanel({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STAGE TILES ROW
-   ═══════════════════════════════════════════════════════════════ */
-function StageTileVideo({ stream }: { stream: MediaStream }) {
+   STAGE TILE VIDEO
+   - El owner ve el video muteado (él escucha el audio via el stream WebRTC principal)
+   - Los viewers NO-owner lo escuchan (muted=false)
+═══════════════════════════════════════════════════════════════ */
+interface StageTileVideoProps {
+  stream:  MediaStream;
+  /** Si true, silencia el audio en el elemento <video> para evitar eco */
+  muted:   boolean;
+  camOff?: boolean;
+}
+
+function StageTileVideo({ stream, muted, camOff }: StageTileVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     el.srcObject = stream;
-    el.muted     = true;
+    el.muted     = muted;
     el.play().catch(() => {});
     return () => { el.srcObject = null; };
-  }, [stream]);
+  }, [stream, muted]);
 
+  // Cuando camOff cambia, no necesitamos reemplazar el srcObject;
+  // el track ya fue deshabilitado en origen. Solo ocultamos el video.
   return (
     <video
       ref={videoRef}
       autoPlay
       playsInline
-      muted
-      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: "scaleX(-1)" }}
+      style={{
+        width: "100%", height: "100%", objectFit: "cover", display: "block",
+        transform: "scaleX(-1)",
+        opacity: camOff ? 0 : 1,
+        transition: "opacity 0.3s",
+      }}
     />
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   STAGE TILES ROW
+═══════════════════════════════════════════════════════════════ */
 interface StageTilesRowProps {
   tiles:      StageTileStream[];
-  isOwner:    boolean;
+  /** true si quien ve esto es el owner o un admin */
+  isAuthority: boolean;
   onRemove:   (socketId: string) => void;
   onMuteMic?: (socketId: string, mute: boolean, lock: boolean) => void;
   onMuteCam?: (socketId: string, off: boolean, lock: boolean) => void;
+  /** socketId propio del viewer (para mutear su propia tile y evitar eco) */
+  mySocketId?: string;
 }
 
-export function StageTilesRow({ tiles, isOwner, onRemove, onMuteMic, onMuteCam }: StageTilesRowProps) {
+export function StageTilesRow({
+  tiles,
+  isAuthority,
+  onRemove,
+  onMuteMic,
+  onMuteCam,
+  mySocketId,
+}: StageTilesRowProps) {
   if (tiles.length === 0) return null;
 
   return (
     <div className="live-stage-tiles" data-count={String(tiles.length)}>
-      {tiles.map((tile) => (
-        <div key={tile.socketId} className="live-stage-tile">
-          <StageTileVideo stream={tile.stream} />
-          <span className="live-stage-tile-label">{tile.name}</span>
+      {tiles.map((tile) => {
+        // El viewer que emite su propio stream no se escucha a sí mismo (eco)
+        const shouldMute = tile.socketId === mySocketId || isAuthority;
 
-          {isOwner && (
-            <>
-              <div className="live-stage-tile-admin">
-                {onMuteMic && (
-                  <button
-                    className={`live-stage-tile-ctrl ${tile.micMuted ? "mic-off" : "mic-on"}${tile.micLocked ? " locked" : ""}`}
-                    onClick={() => onMuteMic(tile.socketId, !tile.micMuted, tile.micLocked ?? false)}
-                    onDoubleClick={() => onMuteMic(tile.socketId, true, !(tile.micLocked ?? false))}
-                    title={tile.micLocked ? "Mic bloqueado (doble clic para desbloquear)" : tile.micMuted ? "Activar mic" : "Silenciar mic (doble clic para bloquear)"}
-                  >
-                    {tile.micLocked
-                      ? <MicOff size={10} strokeWidth={2.5} />
-                      : tile.micMuted
-                        ? <MicOff size={10} strokeWidth={2.5} />
-                        : <Mic size={10} strokeWidth={2.5} />}
-                  </button>
-                )}
-                {onMuteCam && (
-                  <button
-                    className={`live-stage-tile-ctrl ${tile.camOff ? "cam-off" : "cam-on"}${tile.camLocked ? " locked" : ""}`}
-                    onClick={() => onMuteCam(tile.socketId, !tile.camOff, tile.camLocked ?? false)}
-                    onDoubleClick={() => onMuteCam(tile.socketId, true, !(tile.camLocked ?? false))}
-                    title={tile.camLocked ? "Cam bloqueada (doble clic para desbloquear)" : tile.camOff ? "Activar cámara" : "Apagar cámara (doble clic para bloquear)"}
-                  >
-                    {tile.camOff
-                      ? <VideoOff size={10} strokeWidth={2.5} />
-                      : <Video size={10} strokeWidth={2.5} />}
-                  </button>
-                )}
+        return (
+          <div key={tile.socketId} className="live-stage-tile">
+            <StageTileVideo
+              stream={tile.stream}
+              muted={shouldMute}
+              camOff={tile.camOff}
+            />
+
+            {/* Placeholder cuando cam está apagada */}
+            {tile.camOff && (
+              <div className="live-stage-tile-cam-off">
+                <VideoOff size={18} strokeWidth={1.5} />
+                <span>{tile.name}</span>
               </div>
-              <button
-                className="live-stage-tile-remove"
-                onClick={() => onRemove(tile.socketId)}
-                title="Quitar del escenario"
-              >
-                <X size={11} strokeWidth={2.5} />
-              </button>
-            </>
-          )}
+            )}
 
-          {tile.micMuted && (
-            <div className="live-stage-tile-muted-badge" title={tile.micLocked ? "Mic bloqueado por el host" : "Mic silenciado"}>
-              <MicOff size={9} strokeWidth={2.5} />
-              {tile.micLocked && <span style={{ fontSize: 7, marginLeft: 1 }}>🔒</span>}
-            </div>
-          )}
-        </div>
-      ))}
+            {/* Nombre siempre visible */}
+            <span className="live-stage-tile-label">{tile.name}</span>
+
+            {/* Controles del authority (owner/admin) */}
+            {isAuthority && (
+              <>
+                <div className="live-stage-tile-admin">
+                  {onMuteMic && (
+                    <button
+                      className={`live-stage-tile-ctrl ${tile.micMuted ? "mic-off" : "mic-on"}${tile.micLocked ? " locked" : ""}`}
+                      onClick={() => onMuteMic(tile.socketId, !tile.micMuted, tile.micLocked ?? false)}
+                      onDoubleClick={(e) => { e.preventDefault(); onMuteMic(tile.socketId, true, !(tile.micLocked ?? false)); }}
+                      title={tile.micLocked ? "Mic bloqueado" : tile.micMuted ? "Activar mic" : "Silenciar mic"}
+                    >
+                      {tile.micLocked
+                        ? <span style={{ fontSize: 9 }}>🔒</span>
+                        : tile.micMuted
+                          ? <MicOff size={10} strokeWidth={2.5} />
+                          : <Mic size={10} strokeWidth={2.5} />}
+                    </button>
+                  )}
+                  {onMuteCam && (
+                    <button
+                      className={`live-stage-tile-ctrl ${tile.camOff ? "cam-off" : "cam-on"}${tile.camLocked ? " locked" : ""}`}
+                      onClick={() => onMuteCam(tile.socketId, !tile.camOff, tile.camLocked ?? false)}
+                      onDoubleClick={(e) => { e.preventDefault(); onMuteCam(tile.socketId, true, !(tile.camLocked ?? false)); }}
+                      title={tile.camLocked ? "Cam bloqueada" : tile.camOff ? "Activar cámara" : "Apagar cámara"}
+                    >
+                      {tile.camLocked
+                        ? <span style={{ fontSize: 9 }}>🔒</span>
+                        : tile.camOff
+                          ? <VideoOff size={10} strokeWidth={2.5} />
+                          : <Video size={10} strokeWidth={2.5} />}
+                    </button>
+                  )}
+                </div>
+                <button className="live-stage-tile-remove" onClick={() => onRemove(tile.socketId)} title="Quitar">
+                  <X size={11} strokeWidth={2.5} />
+                </button>
+              </>
+            )}
+
+            {/* Badge mic silenciado (visible para todos) */}
+            {tile.micMuted && (
+              <div className="live-stage-tile-muted-badge">
+                <MicOff size={9} strokeWidth={2.5} />
+                {tile.micLocked && <span style={{ fontSize: 7, marginLeft: 1 }}>🔒</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STAGE SELF CONTROLS
-   Controles del VIEWER invitado al escenario.
-   - Si el owner bloqueó mic/cam, el botón aparece deshabilitado.
-   ═══════════════════════════════════════════════════════════════ */
+   STAGE SELF CONTROLS — controles del viewer invitado
+═══════════════════════════════════════════════════════════════ */
 interface StageSelfControlsProps {
   micOn:       boolean;
   camOn:       boolean;
@@ -477,12 +519,7 @@ interface StageSelfControlsProps {
 }
 
 export function StageSelfControls({
-  micOn,
-  camOn,
-  micLocked,
-  camLocked,
-  onToggleMic,
-  onToggleCam,
+  micOn, camOn, micLocked, camLocked, onToggleMic, onToggleCam,
 }: StageSelfControlsProps) {
   return (
     <div className="live-stage-self-controls">
@@ -492,9 +529,7 @@ export function StageSelfControls({
         disabled={micLocked}
         title={micLocked ? "El host bloqueó tu micrófono" : micOn ? "Silenciar micrófono" : "Activar micrófono"}
       >
-        {micOn && !micLocked
-          ? <Mic size={18} strokeWidth={1.75} />
-          : <MicOff size={18} strokeWidth={1.75} />}
+        {micOn && !micLocked ? <Mic size={18} strokeWidth={1.75} /> : <MicOff size={18} strokeWidth={1.75} />}
         {micLocked && <span className="live-stage-self-lock">🔒</span>}
       </button>
       <button
@@ -503,9 +538,7 @@ export function StageSelfControls({
         disabled={camLocked}
         title={camLocked ? "El host bloqueó tu cámara" : camOn ? "Apagar cámara" : "Activar cámara"}
       >
-        {camOn && !camLocked
-          ? <Video size={18} strokeWidth={1.75} />
-          : <VideoOff size={18} strokeWidth={1.75} />}
+        {camOn && !camLocked ? <Video size={18} strokeWidth={1.75} /> : <VideoOff size={18} strokeWidth={1.75} />}
         {camLocked && <span className="live-stage-self-lock">🔒</span>}
       </button>
     </div>
