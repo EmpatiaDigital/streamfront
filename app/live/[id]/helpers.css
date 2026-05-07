@@ -653,3 +653,158 @@
     height: 52px;   /* landscape ratio */
   }
 }
+/* ══════════════════════════════════════════════════════════
+   STAGE PANEL — ADMINS SECTION
+   Agrega estos bloques a live.css (o helpers.css)
+══════════════════════════════════════════════════════════ */
+
+.live-stage-admin-section {
+  padding: 8px 10px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  margin-top: 4px;
+}
+
+/* Header de la sección con ícono Users */
+.live-stage-admin-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.3);
+  margin: 0 0 8px 0;
+  padding: 0 2px;
+}
+
+.live-stage-admin-label svg {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+/* Lista de cards */
+.live-stage-admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Card individual estilo navbar dropdown */
+.live-stage-admin-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background 0.12s, border-color 0.12s;
+  cursor: default;
+}
+
+.live-stage-admin-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Card activa (tiene rol de admin) */
+.live-stage-admin-card.is-admin {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.18);
+}
+
+.live-stage-admin-card.is-admin:hover {
+  background: rgba(124, 58, 237, 0.13);
+}
+
+/* Avatar circular con inicial */
+.live-stage-admin-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+
+.live-stage-admin-card.is-admin .live-stage-admin-avatar {
+  background: rgba(124, 58, 237, 0.25);
+  color: #c4b5fd;
+}
+
+/* Columna de info: nombre + badge */
+.live-stage-admin-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Nombre del usuario */
+.live-stage-admin-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+
+/* Pill "Admin" que aparece junto al nombre */
+.live-stage-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(124, 58, 237, 0.2);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: #a78bfa;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Botón de acción: icono solo, sin texto */
+.live-stage-admin-action {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Grant: conceder admin → violeta al hover */
+.live-stage-admin-action.grant:hover {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #a78bfa;
+}
+
+/* Remove: quitar admin → rojo al hover */
+.live-stage-admin-action.remove {
+  color: rgba(248, 113, 113, 0.5);
+}
+
+.live-stage-admin-action.remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
