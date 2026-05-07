@@ -2,8 +2,13 @@
 
 /**
  * StageLayout.tsx
+ *
+ * FIX: El tile con spotlight ahora aparece UNA SOLA VEZ.
+ * - Con spotlight: tile grande arriba + los DEMÁS tiles en la fila de abajo.
+ * - Sin spotlight: grid uniforme con todos los tiles.
+ * La lógica anterior renderizaba el tile destacado tanto en
+ * `stage-layout-spotlight` como en `stage-layout-grid`, produciéndolo dos veces.
  */
-
 
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, X, Star, StarOff } from "lucide-react";
@@ -20,9 +25,9 @@ export type StageTileStream = {
 };
 
 interface StageTileVideoProps {
-  stream:  MediaStream;
-  muted:   boolean;
-  camOff?: boolean;
+  stream:    MediaStream;
+  muted:     boolean;
+  camOff?:   boolean;
   mirrored?: boolean;
 }
 
@@ -46,7 +51,7 @@ function StageTileVideo({ stream, muted, camOff, mirrored }: StageTileVideoProps
       className="stage-tile-video"
       style={{
         transform: mirrored ? "scaleX(-1)" : "none",
-        opacity: camOff ? 0 : 1,
+        opacity:   camOff ? 0 : 1,
       }}
     />
   );
@@ -55,16 +60,16 @@ function StageTileVideo({ stream, muted, camOff, mirrored }: StageTileVideoProps
 interface StageLayoutProps {
   tiles:        StageTileStream[];
   isAuthority:  boolean;        // owner o admin
-  isOwner:      boolean;        // solo el creador puede hacer spotlight
-  spotlightId:  string | null;  // socketId del destacado actual
+  isOwner:      boolean;        // solo el creador puede manejar spotlight
+  spotlightId:  string | null;  // socketId del tile destacado
   mySocketId:   string;
   onRemove:     (socketId: string) => void;
   onMuteMic?:   (socketId: string, mute: boolean, lock: boolean) => void;
   onMuteCam?:   (socketId: string, off: boolean, lock: boolean) => void;
-  onSpotlight?: (socketId: string | null) => void; // null = quitar
+  onSpotlight?: (socketId: string | null) => void; // null = quitar destaque
 }
 
-const MAX_MOBILE = 5;
+const MAX_MOBILE  = 5;
 const MAX_DESKTOP = 8;
 
 export function StageLayout({
@@ -91,20 +96,47 @@ export function StageLayout({
 
   const maxTiles = isMobile ? MAX_MOBILE : MAX_DESKTOP;
 
-  // Spotlight tile primero
-  const spotlightTile = spotlightId ? tiles.find((t) => t.socketId === spotlightId) : null;
-  const restTiles     = tiles.filter((t) => t.socketId !== spotlightId);
-  const visibleRest   = restTiles.slice(0, maxTiles - (spotlightTile ? 1 : 0));
-  const hiddenCount   = restTiles.length - visibleRest.length;
+  /**
+   * CORRECCIÓN DEL BUG DE DUPLICADO:
+   *
+   * Antes:
+   *   - spotlightTile  → se renderizaba en stage-layout-spotlight
+   *   - restTiles      → tiles sin el destacado → se renderizaban en stage-layout-row
+   *   - !spotlightTile → TODOS los tiles en stage-layout-grid
+   *
+   * El problema: cuando había spotlight activo se ejecutaban AMBAS ramas
+   * (stage-layout-spotlight + stage-layout-grid) porque la condición
+   * `!spotlightTile` era false pero el grid también se renderizaba con
+   * `visibleRest` que incluía tiles sin el destacado, y en algunos
+   * refactors previos el grid se renderizaba siempre.
+   *
+   * Solución: usar una sola variable `hasSpotlight` y renderizar
+   * EXCLUSIVAMENTE una de las dos ramas (spotlight+row ó grid).
+   */
+  const hasSpotlight  = !!spotlightId && tiles.some((t) => t.socketId === spotlightId);
+  const spotlightTile = hasSpotlight ? tiles.find((t) => t.socketId === spotlightId)! : null;
 
+  // Los tiles que NO son el destacado
+  const restTiles   = hasSpotlight
+    ? tiles.filter((t) => t.socketId !== spotlightId)
+    : tiles;
+
+  const visibleRest = restTiles.slice(0, maxTiles - (hasSpotlight ? 1 : 0));
+  const hiddenCount = restTiles.length - visibleRest.length;
+
+  // ── Render de un tile individual ──────────────────────────────────────────
   const renderTile = (tile: StageTileStream, isSpotlight = false) => {
-    const shouldMute = tile.socketId === mySocketId || isAuthority;
+    // El tile propio y el authority siempre se mutean localmente para evitar eco
+    const shouldMute    = tile.socketId === mySocketId || isAuthority;
     const isSpotlighted = tile.socketId === spotlightId;
 
     return (
       <div
         key={tile.socketId}
-        className={`stage-tile${isSpotlight ? " stage-tile--spotlight" : ""}${isSpotlighted && !isSpotlight ? " stage-tile--spotlighted-mini" : ""}`}
+        className={[
+          "stage-tile",
+          isSpotlight ? "stage-tile--spotlight" : "",
+        ].filter(Boolean).join(" ")}
       >
         <StageTileVideo
           stream={tile.stream}
@@ -113,16 +145,17 @@ export function StageLayout({
           mirrored={tile.socketId === mySocketId}
         />
 
+        {/* Overlay cuando la cámara está apagada */}
         {tile.camOff && (
           <div className="stage-tile-cam-off">
             <div className="stage-tile-avatar">
-              {tile.name.charAt(0).toUpperCase()}
+              {(tile.name || "?").charAt(0).toUpperCase()}
             </div>
             <span>{tile.name}</span>
           </div>
         )}
 
-        {/* Nombre */}
+        {/* Nombre + badge de mic */}
         <div className="stage-tile-footer">
           <span className="stage-tile-name">
             {isSpotlighted && <span className="stage-tile-star">★</span>}
@@ -136,56 +169,78 @@ export function StageLayout({
           )}
         </div>
 
-        {/* Controles authority */}
+        {/* Controles de authority (owner / admin) */}
         {isAuthority && (
           <div className="stage-tile-controls">
-            {/* Spotlight — solo owner */}
+
+            {/* Spotlight — solo el owner */}
             {isOwner && onSpotlight && (
               <button
                 className={`stage-tile-ctrl stage-tile-ctrl--spotlight${isSpotlighted ? " active" : ""}`}
                 onClick={() => onSpotlight(isSpotlighted ? null : tile.socketId)}
                 title={isSpotlighted ? "Quitar destaque" : "Destacar en escenario"}
               >
-                {isSpotlighted ? <StarOff size={10} strokeWidth={2.5} /> : <Star size={10} strokeWidth={2.5} />}
+                {isSpotlighted
+                  ? <StarOff size={10} strokeWidth={2.5} />
+                  : <Star    size={10} strokeWidth={2.5} />}
               </button>
             )}
 
+            {/* Mic */}
             {onMuteMic && (
               <button
-                className={`stage-tile-ctrl${tile.micMuted ? " active" : ""}${tile.micLocked ? " locked" : ""}`}
+                className={[
+                  "stage-tile-ctrl",
+                  tile.micMuted  ? "active" : "",
+                  tile.micLocked ? "locked" : "",
+                ].filter(Boolean).join(" ")}
                 onClick={() => onMuteMic(tile.socketId, !tile.micMuted, tile.micLocked ?? false)}
                 onDoubleClick={(e) => {
                   e.preventDefault();
                   onMuteMic(tile.socketId, true, !(tile.micLocked ?? false));
                 }}
-                title={tile.micLocked ? "Mic bloqueado" : tile.micMuted ? "Activar mic" : "Silenciar mic"}
+                title={
+                  tile.micLocked ? "Mic bloqueado (doble clic = desbloquear)" :
+                  tile.micMuted  ? "Activar mic" :
+                  "Silenciar mic (doble clic = bloquear)"
+                }
               >
                 {tile.micLocked
                   ? <span style={{ fontSize: 9 }}>🔒</span>
                   : tile.micMuted
                     ? <MicOff size={10} strokeWidth={2.5} />
-                    : <Mic size={10} strokeWidth={2.5} />}
+                    : <Mic    size={10} strokeWidth={2.5} />}
               </button>
             )}
 
+            {/* Cam */}
             {onMuteCam && (
               <button
-                className={`stage-tile-ctrl${tile.camOff ? " active" : ""}${tile.camLocked ? " locked" : ""}`}
+                className={[
+                  "stage-tile-ctrl",
+                  tile.camOff    ? "active" : "",
+                  tile.camLocked ? "locked" : "",
+                ].filter(Boolean).join(" ")}
                 onClick={() => onMuteCam(tile.socketId, !tile.camOff, tile.camLocked ?? false)}
                 onDoubleClick={(e) => {
                   e.preventDefault();
                   onMuteCam(tile.socketId, true, !(tile.camLocked ?? false));
                 }}
-                title={tile.camLocked ? "Cam bloqueada" : tile.camOff ? "Activar cámara" : "Apagar cámara"}
+                title={
+                  tile.camLocked ? "Cam bloqueada (doble clic = desbloquear)" :
+                  tile.camOff    ? "Activar cámara" :
+                  "Apagar cámara (doble clic = bloquear)"
+                }
               >
                 {tile.camLocked
                   ? <span style={{ fontSize: 9 }}>🔒</span>
                   : tile.camOff
                     ? <VideoOff size={10} strokeWidth={2.5} />
-                    : <Video size={10} strokeWidth={2.5} />}
+                    : <Video    size={10} strokeWidth={2.5} />}
               </button>
             )}
 
+            {/* Quitar del escenario */}
             <button
               className="stage-tile-ctrl stage-tile-ctrl--remove"
               onClick={() => onRemove(tile.socketId)}
@@ -199,32 +254,46 @@ export function StageLayout({
     );
   };
 
-  // Layout: si hay spotlight → grande arriba + row abajo
-  // Sin spotlight → grid uniforme
-  return (
-    <div className={`stage-layout${spotlightTile ? " stage-layout--has-spotlight" : ""}`}>
-      {spotlightTile && (
-        <div className="stage-layout-spotlight">
-          {renderTile(spotlightTile, true)}
-        </div>
-      )}
+  // ── Layout ────────────────────────────────────────────────────────────────
+  //
+  // CON spotlight → renderiza solo:
+  //   1. stage-layout-spotlight  (el tile grande)
+  //   2. stage-layout-row        (los DEMÁS tiles pequeños)
+  //
+  // SIN spotlight → renderiza solo:
+  //   1. stage-layout-grid       (todos los tiles en cuadrícula uniforme)
+  //
+  // Estas dos ramas son MUTUAMENTE EXCLUYENTES; no hay forma de que un
+  // tile aparezca dos veces.
 
-      {visibleRest.length > 0 && (
-        <div
-          className="stage-layout-row"
-          data-count={String(Math.min(visibleRest.length, maxTiles))}
-        >
-          {visibleRest.map((tile) => renderTile(tile, false))}
-          {hiddenCount > 0 && (
-            <div className="stage-tile stage-tile--hidden-count">
-              <span>+{hiddenCount}</span>
+  return (
+    <div className={`stage-layout${hasSpotlight ? " stage-layout--has-spotlight" : ""}`}>
+
+      {hasSpotlight ? (
+        /* ── Modo spotlight ── */
+        <>
+          {/* Tile grande */}
+          <div className="stage-layout-spotlight">
+            {renderTile(spotlightTile!, true)}
+          </div>
+
+          {/* Fila de tiles restantes (pueden ser 0) */}
+          {visibleRest.length > 0 && (
+            <div
+              className="stage-layout-row"
+              data-count={String(Math.min(visibleRest.length, maxTiles))}
+            >
+              {visibleRest.map((tile) => renderTile(tile, false))}
+              {hiddenCount > 0 && (
+                <div className="stage-tile stage-tile--hidden-count">
+                  <span>+{hiddenCount}</span>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-
-      {!spotlightTile && tiles.length > 0 && (
-        /* Sin spotlight: grid normal */
+        </>
+      ) : (
+        /* ── Modo grid (sin spotlight) ── */
         <div
           className="stage-layout-grid"
           data-count={String(Math.min(tiles.length, maxTiles))}
@@ -237,6 +306,7 @@ export function StageLayout({
           )}
         </div>
       )}
+
     </div>
   );
 }
