@@ -47,11 +47,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 // ─── Utility: normalize MongoDB _id → id ───
-// Call this whenever you receive a user object from the API
-// so the whole app can safely use user.id everywhere.
 export function normalizeUser(raw: any): User {
   return {
     ...raw,
     id: raw.id ?? raw._id,
+    name: raw.name?.trim() || raw.username?.trim() || "Sin nombre",
   };
 }
