@@ -16,7 +16,6 @@ import {
   ChatMessages,
   GiftPicker,
   GiftShopModal,
-   BgPicker,
   StagePanel,
   StageSelfControls,
   GIFT_EMOJIS,
