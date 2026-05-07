@@ -11,7 +11,6 @@ import "./live.css";
 
 import { AuthContext } from "../../context/AuthContext";
 
-
 import {
   ChatMessages,
   GiftPicker,
@@ -19,6 +18,7 @@ import {
   StagePanel,
   StageTilesRow,
   StageSelfControls,
+  BgPicker,
   GIFT_EMOJIS,
   GIFT_LABELS,
   type ChatMsg,
@@ -82,6 +82,7 @@ export default function LivePage() {
   const streamReadyRef   = useRef(false);
   const socketReadyRef   = useRef(false);
   const autoPlayRetryRef = useRef<(() => void) | null>(null);
+  const mySocketIdRef    = useRef<string>("");
 
   // ── Estado base ───────────────────────────────────────────────────────────
   const [live,      setLive]      = useState<LiveData | null>(null);
@@ -105,6 +106,9 @@ export default function LivePage() {
   const [copied,       setCopied]       = useState(false);
   const [showViewers,  setShowViewers]  = useState(false);
 
+  // ── Fondo personalizable ──────────────────────────────────────────────────
+  const [bgColor, setBgColor] = useState("#000000");
+
   // ── Gifts ─────────────────────────────────────────────────────────────────
   const [balance,     setBalance]     = useState<Balance>({
     corazon: 0, estrella: 0, fuego: 0, diamante: 0, corona: 0, cohete: 0,
@@ -119,23 +123,14 @@ export default function LivePage() {
   const [isOnStage,         setIsOnStage]         = useState(false);
   const [stageMicOn,        setStageMicOn]        = useState(true);
   const [stageCamOn,        setStageCamOn]        = useState(true);
+  const [stageMicLocked,    setStageMicLocked]    = useState(false);
+  const [stageCamLocked,    setStageCamLocked]    = useState(false);
 
-  /**
-   * Estado de bloqueo recibido del owner para ESTE viewer (cuando está en escenario).
-   * El owner puede bloquear mic/cam para que el invitado no pueda reactivarlos.
-   */
-  const [stageMicLocked, setStageMicLocked] = useState(false);
-  const [stageCamLocked, setStageCamLocked] = useState(false);
+  // ── Admin ─────────────────────────────────────────────────────────────────
+  const [isAdmin,   setIsAdmin]   = useState(false);
+  const [adminList, setAdminList] = useState<string[]>([]);
 
-  // ── Admin designado ───────────────────────────────────────────────────────
-  /**
-   * isAdmin: true si el owner designó a este viewer como admin del live.
-   * El admin puede invitar/quitar del escenario y silenciar mic/cam.
-   */
-  const [isAdmin,    setIsAdmin]    = useState(false);
-  const [adminList,  setAdminList]  = useState<string[]>([]);
-
-  // ── Compartir ─────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/live/${id}`
     : "";
@@ -191,9 +186,7 @@ export default function LivePage() {
     if (!id) return;
     const token = localStorage.getItem("token");
     const { id: myId } = getStoredUser();
-    fetch(`${BACKEND}/api/live/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`${BACKEND}/api/live/${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((data) => {
         const liveData: LiveData = data.live ?? data;
@@ -213,9 +206,7 @@ export default function LivePage() {
   useEffect(() => {
     if (isOwner === null || isOwner === true) return;
     const token = localStorage.getItem("token");
-    fetch(`${BACKEND}/api/live/gifts/balance`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`${BACKEND}/api/live/gifts/balance`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => { if (data.balance) setBalance(data.balance); })
       .catch(() => {});
@@ -244,15 +235,12 @@ export default function LivePage() {
   useEffect(() => {
     if (!id || isOwner === null) return;
     const token = localStorage.getItem("token");
-    const s = io(BACKEND, {
-      auth: { token },
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-    });
+    const s = io(BACKEND, { auth: { token }, reconnectionDelay: 1000, reconnectionAttempts: 5 });
     socketRef.current = s;
 
     s.on("connect", () => {
       socketReadyRef.current = true;
+      mySocketIdRef.current  = s.id ?? "";
       s.emit("live:join", { liveId: id });
       if (isOwner) {
         tryRegisterStreamer();
@@ -279,25 +267,12 @@ export default function LivePage() {
       setLive((p) => (p ? { ...p, status: "ended" } : p));
     });
 
-    // Lista de admins (solo el owner la recibe)
-    s.on("live:adminList", ({ admins }: { admins: string[] }) => {
-      setAdminList(admins);
-    });
+    s.on("live:adminList",    ({ admins }: { admins: string[] }) => setAdminList(admins));
+    s.on("live:youAreAdmin",  () => setIsAdmin(true));
+    s.on("live:adminRevoked", () => setIsAdmin(false));
 
-    // Notificación al viewer de que fue designado admin
-    s.on("live:youAreAdmin", () => {
-      setIsAdmin(true);
-    });
-
-    // Notificación al viewer de que le quitaron el rol de admin
-    s.on("live:adminRevoked", () => {
-      setIsAdmin(false);
-    });
-
-    // ── stageUpdate: ahora incluye micLocked / camLocked ─────────────────
-    s.on("live:stageUpdate", ({
-      participants,
-    }: { participants: StageParticipant[] }) => {
+    // ── stageUpdate ───────────────────────────────────────────────────────
+    s.on("live:stageUpdate", ({ participants }: { participants: StageParticipant[] }) => {
       setStageParticipants(participants);
       setStageTiles((prev) => {
         const ids = new Set(participants.map((p) => p.socketId));
@@ -305,9 +280,7 @@ export default function LivePage() {
           .filter((t) => ids.has(t.socketId))
           .map((t) => {
             const p = participants.find((x) => x.socketId === t.socketId);
-            return p
-              ? { ...t, micLocked: p.micLocked, camLocked: p.camLocked }
-              : t;
+            return p ? { ...t, micMuted: p.micMuted, camOff: p.camOff, micLocked: p.micLocked, camLocked: p.camLocked } : t;
           });
       });
     });
@@ -315,21 +288,19 @@ export default function LivePage() {
     // ── Owner silencia mic del invitado ───────────────────────────────────
     s.on("stage:adminMuteMic", ({ mute, lock }: { mute: boolean; lock: boolean }) => {
       const stream = stageStreamRef.current;
-      if (stream) {
-        stream.getAudioTracks().forEach((t) => { t.enabled = !mute; });
-      }
+      if (stream) stream.getAudioTracks().forEach((t) => { t.enabled = !mute; });
       setStageMicOn(!mute);
       setStageMicLocked(lock);
+      // Reportar al servidor el nuevo estado real
+      s.emit("stage:selfState", { liveId: id, micOn: !mute, camOn: stageCamOn });
     });
 
-    // ── Owner apaga cam del invitado ──────────────────────────────────────
     s.on("stage:adminMuteCam", ({ off, lock }: { off: boolean; lock: boolean }) => {
       const stream = stageStreamRef.current;
-      if (stream) {
-        stream.getVideoTracks().forEach((t) => { t.enabled = !off; });
-      }
+      if (stream) stream.getVideoTracks().forEach((t) => { t.enabled = !off; });
       setStageCamOn(!off);
       setStageCamLocked(lock);
+      s.emit("stage:selfState", { liveId: id, micOn: stageMicOn, camOn: !off });
     });
 
     // ── WebRTC principal ──────────────────────────────────────────────────
@@ -404,6 +375,7 @@ export default function LivePage() {
     });
 
     // ── WebRTC escenario ──────────────────────────────────────────────────
+
     s.on("stage:invited", async ({ ownerSocketId }: { ownerSocketId: string }) => {
       if (isOwner) return;
       try {
@@ -438,7 +410,12 @@ export default function LivePage() {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        s.emit("stage:offer", { targetSocketId: ownerSocketId, fromName: myUsername, sdp: offer });
+        // fromName con el nombre real del JWT
+        s.emit("stage:offer", {
+          targetSocketId: ownerSocketId,
+          fromName:       myUsername,
+          sdp:            offer,
+        });
       } catch (err) {
         console.warn("stage:invited — no se pudo acceder a la cámara:", err);
       }
@@ -499,8 +476,7 @@ export default function LivePage() {
     });
 
     s.on("stage:removed", () => {
-      const pc = stagePCsRef.current.get("owner");
-      pc?.close();
+      stagePCsRef.current.get("owner")?.close();
       stagePCsRef.current.delete("owner");
       stageStreamRef.current?.getTracks().forEach((t) => t.stop());
       stageStreamRef.current = null;
@@ -517,11 +493,6 @@ export default function LivePage() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isOwner, createStreamerPC, fullCleanup, tryRegisterStreamer, tryPlayRemote, myUsername]);
-
-  // Actualizar isAdmin en los handlers cuando cambia (closure stale)
-  // Se usa un ref para evitar re-montar el socket
-  const isAdminRef = useRef(isAdmin);
-  useEffect(() => { isAdminRef.current = isAdmin; }, [isAdmin]);
 
   // ── Cámara del streamer (owner) ───────────────────────────────────────────
   useEffect(() => {
@@ -653,11 +624,6 @@ export default function LivePage() {
     socketRef.current?.emit("stage:remove", { liveId: id, targetSocketId: socketId });
   };
 
-  /**
-   * Owner/admin silencia mic de un participante.
-   * @param mute  true = apagar mic
-   * @param lock  true = bloquear control del invitado
-   */
   const adminMuteMic = (socketId: string, mute: boolean, lock: boolean) => {
     setStageParticipants((prev) =>
       prev.map((p) => p.socketId === socketId ? { ...p, micMuted: mute, micLocked: lock } : p)
@@ -668,11 +634,6 @@ export default function LivePage() {
     socketRef.current?.emit("stage:adminMuteMic", { liveId: id, targetSocketId: socketId, mute, lock });
   };
 
-  /**
-   * Owner/admin apaga/prende cam de un participante.
-   * @param off   true = apagar cam
-   * @param lock  true = bloquear control del invitado
-   */
   const adminMuteCam = (socketId: string, off: boolean, lock: boolean) => {
     setStageParticipants((prev) =>
       prev.map((p) => p.socketId === socketId ? { ...p, camOff: off, camLocked: lock } : p)
@@ -683,10 +644,7 @@ export default function LivePage() {
     socketRef.current?.emit("stage:adminMuteCam", { liveId: id, targetSocketId: socketId, off, lock });
   };
 
-  /**
-   * Viewer en escenario: alterna su propio mic.
-   * Solo funciona si el owner NO lo bloqueó.
-   */
+  // El viewer alterna su propio mic (solo si no está bloqueado)
   const toggleStageMic = () => {
     if (stageMicLocked) return;
     const stream = stageStreamRef.current;
@@ -694,12 +652,9 @@ export default function LivePage() {
     const next = !stageMicOn;
     stream.getAudioTracks().forEach((t) => { t.enabled = next; });
     setStageMicOn(next);
+    socketRef.current?.emit("stage:selfState", { liveId: id, micOn: next, camOn: stageCamOn });
   };
 
-  /**
-   * Viewer en escenario: alterna su propia cam.
-   * Solo funciona si el owner NO la bloqueó.
-   */
   const toggleStageCam = () => {
     if (stageCamLocked) return;
     const stream = stageStreamRef.current;
@@ -707,16 +662,13 @@ export default function LivePage() {
     const next = !stageCamOn;
     stream.getVideoTracks().forEach((t) => { t.enabled = next; });
     setStageCamOn(next);
+    socketRef.current?.emit("stage:selfState", { liveId: id, micOn: stageMicOn, camOn: next });
   };
 
-  /** Owner designa o quita admin a un viewer */
   const setAdminForViewer = (targetSocketId: string, isAdminFlag: boolean) => {
     socketRef.current?.emit("live:setAdmin", { liveId: id, targetSocketId, isAdmin: isAdminFlag });
-    // Actualizar lista local optimistamente
     setAdminList((prev) =>
-      isAdminFlag
-        ? [...prev, targetSocketId]
-        : prev.filter((s) => s !== targetSocketId)
+      isAdminFlag ? [...prev, targetSocketId] : prev.filter((s) => s !== targetSocketId)
     );
   };
 
@@ -755,7 +707,7 @@ export default function LivePage() {
     <div className="live-root">
 
       {/* ══ Área de video ═══════════════════════════════════════════════════ */}
-      <div className="live-video-area">
+      <div className="live-video-area" style={{ background: bgColor }}>
 
         {/* Video local del streamer (owner) */}
         {isOwner && (
@@ -767,7 +719,7 @@ export default function LivePage() {
           />
         )}
 
-        {/* Video remoto (viewer) */}
+        {/* Video remoto (viewer normal) */}
         {!isOwner && (
           <>
             <video
@@ -805,13 +757,14 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Tiles del escenario */}
+        {/* Tiles del escenario — visibles para todos */}
         <StageTilesRow
           tiles={stageTiles}
-          isOwner={!!isOwner || isAdmin}
+          isAuthority={!!isOwner || isAdmin}
           onRemove={removeFromStage}
           onMuteMic={(isOwner || isAdmin) ? adminMuteMic : undefined}
           onMuteCam={(isOwner || isAdmin) ? adminMuteCam : undefined}
+          mySocketId={mySocketIdRef.current}
         />
 
         {/* Badges */}
@@ -828,13 +781,9 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Badge de admin (para el viewer designado) */}
+        {/* Badge admin */}
         {!isOwner && isAdmin && (
-          <div
-            className="live-badge-viewers"
-            style={{ top: 40, background: "rgba(124,58,237,0.85)" }}
-            title="Sos admin de este live"
-          >
+          <div className="live-badge-viewers" style={{ top: 40, background: "rgba(124,58,237,0.85)" }}>
             👮 Admin
           </div>
         )}
@@ -844,15 +793,18 @@ export default function LivePage() {
           <div className="live-gift-anim">
             <span className="live-gift-anim-emoji">{GIFT_EMOJIS[giftAnim.type] ?? "🎁"}</span>
             <p>
-              <strong>{giftAnim.from}</strong>
-              {" envió "}
-              <strong>{GIFT_LABELS[giftAnim.type] ?? giftAnim.type}</strong>
-              {" x"}{giftAnim.amount}
+              <strong>{giftAnim.from}</strong>{" envió "}
+              <strong>{GIFT_LABELS[giftAnim.type] ?? giftAnim.type}</strong>{" x"}{giftAnim.amount}
             </p>
           </div>
         )}
 
-        {/* Controles flotantes en el área de video */}
+        {/* Selector de fondo (owner y admin) */}
+        {(isOwner || isAdmin) && (
+          <BgPicker current={bgColor} onChange={setBgColor} />
+        )}
+
+        {/* Controles del owner */}
         {isOwner && (
           <div className="live-owner-controls">
             <button onClick={toggleMic} className={`live-ctrl-btn${micOn ? "" : " off"}`}>
@@ -864,7 +816,7 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Viewer en escenario: controles propios, con bloqueo si el owner lo pidió */}
+        {/* Controles del viewer invitado al escenario */}
         {!isOwner && isOnStage && (
           <StageSelfControls
             micOn={stageMicOn}
@@ -880,7 +832,6 @@ export default function LivePage() {
       {/* ══ Panel de chat ═══════════════════════════════════════════════════ */}
       <div className="live-chat-panel">
 
-        {/* Header */}
         <div className="live-chat-header">
           <span className="live-chat-title">Chat en vivo</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -894,10 +845,8 @@ export default function LivePage() {
                   display: "flex", alignItems: "center", gap: 4,
                   color: showViewers ? "#c4b5fd" : "inherit",
                 }}
-                title="Ver espectadores"
               >
-                <Users size={11} strokeWidth={2} />
-                {viewers}
+                <Users size={11} strokeWidth={2} />{viewers}
               </button>
             )}
             {isOwner && (
@@ -909,7 +858,6 @@ export default function LivePage() {
           </div>
         </div>
 
-        {/* Viewers online (colapsable) */}
         {showViewers && viewerList.length > 0 && (
           <div className="live-viewers-panel">
             <p className="live-viewers-label">Viendo ahora ({viewerList.length})</p>
@@ -926,7 +874,6 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Info del stream */}
         <div className="live-stream-info">
           <div className="live-stream-info-row">
             {status === "live"    && <span className="live-pill live-pill-live">LIVE</span>}
@@ -938,7 +885,7 @@ export default function LivePage() {
           </span>
         </div>
 
-        {/* Panel del escenario (owner y admin) */}
+        {/* Panel del escenario — owner y admins */}
         {(isOwner || isAdmin) && status === "live" && (
           <StagePanel
             viewerList={viewerList}
@@ -953,23 +900,18 @@ export default function LivePage() {
           />
         )}
 
-        {/* Barra de compartir */}
         <div className="live-share-bar">
           {isOwner && (
             <button
               className={`live-share-toggle ${shareEnabled ? "on" : "off"}`}
               onClick={toggleShare}
-              title={shareEnabled ? "Deshabilitar compartir" : "Habilitar compartir"}
             >
               {shareEnabled ? <Link size={12} strokeWidth={2} /> : <Link2Off size={12} strokeWidth={2} />}
               {shareEnabled ? "ON" : "OFF"}
             </button>
           )}
           {(shareEnabled || isOwner) ? (
-            <button
-              className={`live-share-copy ${copied ? "copied" : "default"}`}
-              onClick={copyLink}
-            >
+            <button className={`live-share-copy ${copied ? "copied" : "default"}`} onClick={copyLink}>
               <Link size={11} strokeWidth={2} />
               {copied ? "¡Enlace copiado!" : "Copiar enlace del stream"}
             </button>
@@ -978,14 +920,8 @@ export default function LivePage() {
           )}
         </div>
 
-        {/* Chat */}
-        <ChatMessages
-          chat={chat}
-          myUsername={myUsername}
-          ownerUsername={streamerName}
-        />
+        <ChatMessages chat={chat} myUsername={myUsername} ownerUsername={streamerName} />
 
-        {/* Gift picker */}
         {!isOwner && status === "live" && giftOpen && (
           <GiftPicker
             balance={balance}
@@ -996,14 +932,12 @@ export default function LivePage() {
           />
         )}
 
-        {/* Input de chat */}
         <div className="live-chat-actions">
           <div className="live-input-row">
             {!isOwner && status === "live" && (
               <button
                 className={`live-action-btn live-action-gift${giftOpen ? " active" : ""}`}
                 onClick={() => setGiftOpen((v) => !v)}
-                title="Enviar regalo"
               >
                 <Gift size={16} strokeWidth={1.75} />
               </button>
@@ -1028,7 +962,6 @@ export default function LivePage() {
         </div>
       </div>
 
-      {/* Modal tienda */}
       {buyOpen && (
         <GiftShopModal
           balance={balance}
