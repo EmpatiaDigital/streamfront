@@ -16,7 +16,7 @@ import {
   GiftPicker,
   GiftShopModal,
   StagePanel,
-  StageTilesRow,
+  // StageTilesRow  ← ya no se usa; lo reemplaza StageLayout
   StageSelfControls,
   BgPicker,
   GIFT_EMOJIS,
@@ -26,8 +26,10 @@ import {
   type Balance,
   type ViewerInfo,
   type StageParticipant,
-  type StageTileStream,
 } from "./LiveHelpers";
+
+// ── StageLayout (nuevo componente integrado) ──────────────────────────────────
+import { StageLayout, type StageTileStream } from "./StageLayout";
 
 const BACKEND = "https://stream-72mw.onrender.com";
 
@@ -126,6 +128,9 @@ export default function LivePage() {
   const [stageMicLocked,    setStageMicLocked]    = useState(false);
   const [stageCamLocked,    setStageCamLocked]    = useState(false);
 
+  // ── Spotlight (nuevo) ─────────────────────────────────────────────────────
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
+
   // ── Admin ─────────────────────────────────────────────────────────────────
   const [isAdmin,   setIsAdmin]   = useState(false);
   const [adminList, setAdminList] = useState<string[]>([]);
@@ -158,6 +163,7 @@ export default function LivePage() {
     setIsOnStage(false);
     setStageMicLocked(false);
     setStageCamLocked(false);
+    setSpotlightId(null);
   }, []);
 
   const tryPlayRemote = useCallback((videoEl: HTMLVideoElement) => {
@@ -285,13 +291,19 @@ export default function LivePage() {
       });
     });
 
+    // ── Spotlight (nuevo) ─────────────────────────────────────────────────
+    // El servidor puede emitir "stage:spotlight" para sincronizar el estado
+    // entre todos los viewers cuando el owner cambia el destacado.
+    s.on("stage:spotlight", ({ socketId }: { socketId: string | null }) => {
+      setSpotlightId(socketId);
+    });
+
     // ── Owner silencia mic del invitado ───────────────────────────────────
     s.on("stage:adminMuteMic", ({ mute, lock }: { mute: boolean; lock: boolean }) => {
       const stream = stageStreamRef.current;
       if (stream) stream.getAudioTracks().forEach((t) => { t.enabled = !mute; });
       setStageMicOn(!mute);
       setStageMicLocked(lock);
-      // Reportar al servidor el nuevo estado real
       s.emit("stage:selfState", { liveId: id, micOn: !mute, camOn: stageCamOn });
     });
 
@@ -410,7 +422,6 @@ export default function LivePage() {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        // fromName con el nombre real del JWT
         s.emit("stage:offer", {
           targetSocketId: ownerSocketId,
           fromName:       myUsername,
@@ -445,6 +456,8 @@ export default function LivePage() {
         if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           stagePCsRef.current.delete(fromSocketId);
           setStageTiles((prev) => prev.filter((t) => t.socketId !== fromSocketId));
+          // Limpiar spotlight si el tile desconectado era el destacado
+          setSpotlightId((prev) => (prev === fromSocketId ? null : prev));
         }
       };
 
@@ -621,6 +634,8 @@ export default function LivePage() {
     stagePCsRef.current.get(socketId)?.close();
     stagePCsRef.current.delete(socketId);
     setStageTiles((prev) => prev.filter((t) => t.socketId !== socketId));
+    // Limpiar spotlight si se quita al destacado
+    setSpotlightId((prev) => (prev === socketId ? null : prev));
     socketRef.current?.emit("stage:remove", { liveId: id, targetSocketId: socketId });
   };
 
@@ -670,6 +685,15 @@ export default function LivePage() {
     setAdminList((prev) =>
       isAdminFlag ? [...prev, targetSocketId] : prev.filter((s) => s !== targetSocketId)
     );
+  };
+
+  // ── Spotlight: solo el owner puede cambiarlo ──────────────────────────────
+  // Si el servidor no soporta "stage:spotlight" todavía, el cambio es
+  // solo local (el owner lo ve) y puede ignorarse del lado server.
+  const handleSpotlight = (socketId: string | null) => {
+    setSpotlightId(socketId);
+    // Emitir al servidor para sincronizar con los demás viewers
+    socketRef.current?.emit("stage:spotlight", { liveId: id, socketId });
   };
 
   // ── Renders condicionales ─────────────────────────────────────────────────
@@ -757,14 +781,22 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Tiles del escenario — visibles para todos */}
-        <StageTilesRow
+        {/*
+          ══ Tiles del escenario — StageLayout reemplaza StageTilesRow ══
+          Recibe todos los props del layout avanzado:
+          - spotlight, responsive (mobile/desktop), avatares, mirroring propio,
+            controles de authority, y limpieza al desconectar.
+        */}
+        <StageLayout
           tiles={stageTiles}
           isAuthority={!!isOwner || isAdmin}
-          onRemove={removeFromStage}
-          onMuteMic={(isOwner || isAdmin) ? adminMuteMic : undefined}
-          onMuteCam={(isOwner || isAdmin) ? adminMuteCam : undefined}
+          isOwner={!!isOwner}
+          spotlightId={spotlightId}
           mySocketId={mySocketIdRef.current}
+          onRemove={removeFromStage}
+          onMuteMic={(!!isOwner || isAdmin) ? adminMuteMic : undefined}
+          onMuteCam={(!!isOwner || isAdmin) ? adminMuteCam : undefined}
+          onSpotlight={isOwner ? handleSpotlight : undefined}
         />
 
         {/* Badges */}
