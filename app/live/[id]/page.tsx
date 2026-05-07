@@ -74,7 +74,7 @@ export default function LivePage() {
   const remoteVideoRef   = useRef<HTMLVideoElement>(null);
   const socketRef        = useRef<Socket | null>(null);
   const localStreamRef   = useRef<MediaStream | null>(null);
-  const stageStreamRef   = useRef<MediaStream | null>(null);  // stream del viewer en escenario
+  const stageStreamRef   = useRef<MediaStream | null>(null);
   const peerConnsRef     = useRef<Map<string, RTCPeerConnection>>(new Map());
   const peerConnRef      = useRef<RTCPeerConnection | null>(null);
   const stagePCsRef      = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -115,14 +115,24 @@ export default function LivePage() {
   // ── Escenario ─────────────────────────────────────────────────────────────
   const [stageParticipants, setStageParticipants] = useState<StageParticipant[]>([]);
   const [stageTiles,        setStageTiles]        = useState<StageTileStream[]>([]);
+  const [isOnStage,         setIsOnStage]         = useState(false);
+  const [stageMicOn,        setStageMicOn]        = useState(true);
+  const [stageCamOn,        setStageCamOn]        = useState(true);
 
   /**
-   * isOnStage: true cuando ESTE viewer fue invitado al escenario.
-   * Se usa para mostrar StageSelfControls.
+   * Estado de bloqueo recibido del owner para ESTE viewer (cuando está en escenario).
+   * El owner puede bloquear mic/cam para que el invitado no pueda reactivarlos.
    */
-  const [isOnStage,    setIsOnStage]    = useState(false);
-  const [stageMicOn,   setStageMicOn]   = useState(true);
-  const [stageCamOn,   setStageCamOn]   = useState(true);
+  const [stageMicLocked, setStageMicLocked] = useState(false);
+  const [stageCamLocked, setStageCamLocked] = useState(false);
+
+  // ── Admin designado ───────────────────────────────────────────────────────
+  /**
+   * isAdmin: true si el owner designó a este viewer como admin del live.
+   * El admin puede invitar/quitar del escenario y silenciar mic/cam.
+   */
+  const [isAdmin,    setIsAdmin]    = useState(false);
+  const [adminList,  setAdminList]  = useState<string[]>([]);
 
   // ── Compartir ─────────────────────────────────────────────────────────────
   const shareUrl = typeof window !== "undefined"
@@ -150,6 +160,8 @@ export default function LivePage() {
     stagePCsRef.current.clear();
     autoPlayRetryRef.current = null;
     setIsOnStage(false);
+    setStageMicLocked(false);
+    setStageCamLocked(false);
   }, []);
 
   const tryPlayRemote = useCallback((videoEl: HTMLVideoElement) => {
@@ -249,7 +261,7 @@ export default function LivePage() {
     });
     s.on("disconnect", () => { socketReadyRef.current = false; });
 
-    // ── Eventos generales ───────────────────────────────────────────────────
+    // ── Eventos generales ─────────────────────────────────────────────────
     s.on("live:chat",        (m: ChatMsg) => setChat((p) => [...p.slice(-199), m]));
     s.on("live:viewerCount", ({ count }: { count: number }) => setViewers(count));
     s.on("live:viewerList",  ({ viewers: vl }: { viewers: ViewerInfo[] }) => setViewerList(vl));
@@ -266,30 +278,60 @@ export default function LivePage() {
       setLive((p) => (p ? { ...p, status: "ended" } : p));
     });
 
-    s.on("live:stageUpdate", ({ participants }: { participants: StageParticipant[] }) => {
+    // Lista de admins (solo el owner la recibe)
+    s.on("live:adminList", ({ admins }: { admins: string[] }) => {
+      setAdminList(admins);
+    });
+
+    // Notificación al viewer de que fue designado admin
+    s.on("live:youAreAdmin", () => {
+      setIsAdmin(true);
+    });
+
+    // Notificación al viewer de que le quitaron el rol de admin
+    s.on("live:adminRevoked", () => {
+      setIsAdmin(false);
+    });
+
+    // ── stageUpdate: ahora incluye micLocked / camLocked ─────────────────
+    s.on("live:stageUpdate", ({
+      participants,
+    }: { participants: StageParticipant[] }) => {
       setStageParticipants(participants);
       setStageTiles((prev) => {
         const ids = new Set(participants.map((p) => p.socketId));
-        return prev.filter((t) => ids.has(t.socketId));
+        return prev
+          .filter((t) => ids.has(t.socketId))
+          .map((t) => {
+            const p = participants.find((x) => x.socketId === t.socketId);
+            return p
+              ? { ...t, micLocked: p.micLocked, camLocked: p.camLocked }
+              : t;
+          });
       });
     });
 
-    // ── El owner silencia/apaga cam de un participante del escenario ────────
-    s.on("stage:adminMuteMic", ({ mute }: { mute: boolean }) => {
+    // ── Owner silencia mic del invitado ───────────────────────────────────
+    s.on("stage:adminMuteMic", ({ mute, lock }: { mute: boolean; lock: boolean }) => {
       const stream = stageStreamRef.current;
-      if (!stream) return;
-      stream.getAudioTracks().forEach((t) => { t.enabled = !mute; });
+      if (stream) {
+        stream.getAudioTracks().forEach((t) => { t.enabled = !mute; });
+      }
       setStageMicOn(!mute);
+      setStageMicLocked(lock);
     });
 
-    s.on("stage:adminMuteCam", ({ off }: { off: boolean }) => {
+    // ── Owner apaga cam del invitado ──────────────────────────────────────
+    s.on("stage:adminMuteCam", ({ off, lock }: { off: boolean; lock: boolean }) => {
       const stream = stageStreamRef.current;
-      if (!stream) return;
-      stream.getVideoTracks().forEach((t) => { t.enabled = !off; });
+      if (stream) {
+        stream.getVideoTracks().forEach((t) => { t.enabled = !off; });
+      }
       setStageCamOn(!off);
+      setStageCamLocked(lock);
     });
 
-    // ── WebRTC principal ────────────────────────────────────────────────────
+    // ── WebRTC principal ──────────────────────────────────────────────────
     s.on("webrtc:newViewer", async ({ viewerSocketId }: { viewerSocketId: string }) => {
       if (!isOwner || !localStreamRef.current) return;
       const pc    = createStreamerPC(viewerSocketId, localStreamRef.current);
@@ -360,12 +402,7 @@ export default function LivePage() {
       } catch (e) { console.warn("webrtc:ice error:", e); }
     });
 
-    // ── WebRTC escenario ────────────────────────────────────────────────────
-
-    /**
-     * VIEWER: invitado al escenario.
-     * Abre su cámara, envía oferta al owner, y activa StageSelfControls.
-     */
+    // ── WebRTC escenario ──────────────────────────────────────────────────
     s.on("stage:invited", async ({ ownerSocketId }: { ownerSocketId: string }) => {
       if (isOwner) return;
       try {
@@ -374,6 +411,8 @@ export default function LivePage() {
 
         setStageMicOn(true);
         setStageCamOn(true);
+        setStageMicLocked(false);
+        setStageCamLocked(false);
         setIsOnStage(true);
 
         stagePCsRef.current.get("owner")?.close();
@@ -389,6 +428,8 @@ export default function LivePage() {
           if (pc.connectionState === "failed" || pc.connectionState === "closed") {
             stagePCsRef.current.delete("owner");
             setIsOnStage(false);
+            setStageMicLocked(false);
+            setStageCamLocked(false);
             stageStreamRef.current?.getTracks().forEach((t) => t.stop());
             stageStreamRef.current = null;
           }
@@ -405,7 +446,7 @@ export default function LivePage() {
     s.on("stage:offer", async ({
       fromSocketId, fromName, sdp,
     }: { fromSocketId: string; fromName: string; sdp: RTCSessionDescriptionInit }) => {
-      if (!isOwner) return;
+      if (!isOwner && !isAdmin) return;
       stagePCsRef.current.get(fromSocketId)?.close();
       const pc = new RTCPeerConnection(RTC_CONFIG);
       stagePCsRef.current.set(fromSocketId, pc);
@@ -446,7 +487,7 @@ export default function LivePage() {
       fromSocketId, candidate,
     }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
       try {
-        if (isOwner) {
+        if (isOwner || isAdmin) {
           const pc = stagePCsRef.current.get(fromSocketId);
           if (pc?.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(candidate));
         } else {
@@ -463,6 +504,8 @@ export default function LivePage() {
       stageStreamRef.current?.getTracks().forEach((t) => t.stop());
       stageStreamRef.current = null;
       setIsOnStage(false);
+      setStageMicLocked(false);
+      setStageCamLocked(false);
     });
 
     return () => {
@@ -471,7 +514,13 @@ export default function LivePage() {
       socketRef.current      = null;
       socketReadyRef.current = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isOwner, createStreamerPC, fullCleanup, tryRegisterStreamer, tryPlayRemote, myUsername]);
+
+  // Actualizar isAdmin en los handlers cuando cambia (closure stale)
+  // Se usa un ref para evitar re-montar el socket
+  const isAdminRef = useRef(isAdmin);
+  useEffect(() => { isAdminRef.current = isAdmin; }, [isAdmin]);
 
   // ── Cámara del streamer (owner) ───────────────────────────────────────────
   useEffect(() => {
@@ -604,36 +653,41 @@ export default function LivePage() {
   };
 
   /**
-   * Owner silencia mic de un participante del escenario.
-   * Actualiza el estado local y emite al servidor para que lo reenvíe al viewer.
+   * Owner/admin silencia mic de un participante.
+   * @param mute  true = apagar mic
+   * @param lock  true = bloquear control del invitado
    */
-  const adminMuteMic = (socketId: string, mute: boolean) => {
+  const adminMuteMic = (socketId: string, mute: boolean, lock: boolean) => {
     setStageParticipants((prev) =>
-      prev.map((p) => p.socketId === socketId ? { ...p, micMuted: mute } : p)
+      prev.map((p) => p.socketId === socketId ? { ...p, micMuted: mute, micLocked: lock } : p)
     );
     setStageTiles((prev) =>
-      prev.map((t) => t.socketId === socketId ? { ...t, micMuted: mute } : t)
+      prev.map((t) => t.socketId === socketId ? { ...t, micMuted: mute, micLocked: lock } : t)
     );
-    socketRef.current?.emit("stage:adminMuteMic", { liveId: id, targetSocketId: socketId, mute });
+    socketRef.current?.emit("stage:adminMuteMic", { liveId: id, targetSocketId: socketId, mute, lock });
   };
 
   /**
-   * Owner apaga/prende cam de un participante del escenario.
+   * Owner/admin apaga/prende cam de un participante.
+   * @param off   true = apagar cam
+   * @param lock  true = bloquear control del invitado
    */
-  const adminMuteCam = (socketId: string, off: boolean) => {
+  const adminMuteCam = (socketId: string, off: boolean, lock: boolean) => {
     setStageParticipants((prev) =>
-      prev.map((p) => p.socketId === socketId ? { ...p, camOff: off } : p)
+      prev.map((p) => p.socketId === socketId ? { ...p, camOff: off, camLocked: lock } : p)
     );
     setStageTiles((prev) =>
-      prev.map((t) => t.socketId === socketId ? { ...t, camOff: off } : t)
+      prev.map((t) => t.socketId === socketId ? { ...t, camOff: off, camLocked: lock } : t)
     );
-    socketRef.current?.emit("stage:adminMuteCam", { liveId: id, targetSocketId: socketId, off });
+    socketRef.current?.emit("stage:adminMuteCam", { liveId: id, targetSocketId: socketId, off, lock });
   };
 
   /**
    * Viewer en escenario: alterna su propio mic.
+   * Solo funciona si el owner NO lo bloqueó.
    */
   const toggleStageMic = () => {
+    if (stageMicLocked) return;
     const stream = stageStreamRef.current;
     if (!stream) return;
     const next = !stageMicOn;
@@ -643,13 +697,26 @@ export default function LivePage() {
 
   /**
    * Viewer en escenario: alterna su propia cam.
+   * Solo funciona si el owner NO la bloqueó.
    */
   const toggleStageCam = () => {
+    if (stageCamLocked) return;
     const stream = stageStreamRef.current;
     if (!stream) return;
     const next = !stageCamOn;
     stream.getVideoTracks().forEach((t) => { t.enabled = next; });
     setStageCamOn(next);
+  };
+
+  /** Owner designa o quita admin a un viewer */
+  const setAdminForViewer = (targetSocketId: string, isAdminFlag: boolean) => {
+    socketRef.current?.emit("live:setAdmin", { liveId: id, targetSocketId, isAdmin: isAdminFlag });
+    // Actualizar lista local optimistamente
+    setAdminList((prev) =>
+      isAdminFlag
+        ? [...prev, targetSocketId]
+        : prev.filter((s) => s !== targetSocketId)
+    );
   };
 
   // ── Renders condicionales ─────────────────────────────────────────────────
@@ -740,10 +807,10 @@ export default function LivePage() {
         {/* Tiles del escenario */}
         <StageTilesRow
           tiles={stageTiles}
-          isOwner={!!isOwner}
+          isOwner={!!isOwner || isAdmin}
           onRemove={removeFromStage}
-          onMuteMic={isOwner ? adminMuteMic : undefined}
-          onMuteCam={isOwner ? adminMuteCam : undefined}
+          onMuteMic={(isOwner || isAdmin) ? adminMuteMic : undefined}
+          onMuteCam={(isOwner || isAdmin) ? adminMuteCam : undefined}
         />
 
         {/* Badges */}
@@ -760,6 +827,17 @@ export default function LivePage() {
           </div>
         )}
 
+        {/* Badge de admin (para el viewer designado) */}
+        {!isOwner && isAdmin && (
+          <div
+            className="live-badge-viewers"
+            style={{ top: 40, background: "rgba(124,58,237,0.85)" }}
+            title="Sos admin de este live"
+          >
+            👮 Admin
+          </div>
+        )}
+
         {/* Gift anim */}
         {giftAnim && (
           <div className="live-gift-anim">
@@ -773,12 +851,7 @@ export default function LivePage() {
           </div>
         )}
 
-        {/*
-          Controles flotantes en el área de video.
-          - Si es owner: mic + cam del stream principal.
-          - Si es viewer en escenario: mic + cam de su stream en escenario.
-          - Si es viewer normal: nada.
-        */}
+        {/* Controles flotantes en el área de video */}
         {isOwner && (
           <div className="live-owner-controls">
             <button onClick={toggleMic} className={`live-ctrl-btn${micOn ? "" : " off"}`}>
@@ -790,10 +863,13 @@ export default function LivePage() {
           </div>
         )}
 
+        {/* Viewer en escenario: controles propios, con bloqueo si el owner lo pidió */}
         {!isOwner && isOnStage && (
           <StageSelfControls
             micOn={stageMicOn}
             camOn={stageCamOn}
+            micLocked={stageMicLocked}
+            camLocked={stageCamLocked}
             onToggleMic={toggleStageMic}
             onToggleCam={toggleStageCam}
           />
@@ -838,7 +914,12 @@ export default function LivePage() {
             <p className="live-viewers-label">Viendo ahora ({viewerList.length})</p>
             <div className="live-viewers-chips">
               {viewerList.map((v, i) => (
-                <span key={i} className="live-viewer-chip">{v.name}</span>
+                <span key={i} className="live-viewer-chip">
+                  {v.name}
+                  {adminList.includes(v.socketId ?? "") && (
+                    <span title="Admin" style={{ marginLeft: 3, fontSize: 9 }}>👮</span>
+                  )}
+                </span>
               ))}
             </div>
           </div>
@@ -856,8 +937,8 @@ export default function LivePage() {
           </span>
         </div>
 
-        {/* Panel del escenario (solo owner) */}
-        {isOwner && status === "live" && (
+        {/* Panel del escenario (owner y admin) */}
+        {(isOwner || isAdmin) && status === "live" && (
           <StagePanel
             viewerList={viewerList}
             stageParticipants={stageParticipants}
@@ -865,6 +946,9 @@ export default function LivePage() {
             onRemove={removeFromStage}
             onMuteMic={adminMuteMic}
             onMuteCam={adminMuteCam}
+            isOwner={!!isOwner}
+            adminList={adminList}
+            onSetAdmin={isOwner ? setAdminForViewer : undefined}
           />
         )}
 
