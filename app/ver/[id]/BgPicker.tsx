@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Palette } from "lucide-react";
+import  "../../live/[id]/live.css";
 
 const PRESETS = [
   { label: "Negro",     value: "#000000" },
