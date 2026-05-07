@@ -17,9 +17,7 @@ import {
   GiftPicker,
   GiftShopModal,
   StagePanel,
-  // StageTilesRow  ← ya no se usa; lo reemplaza StageLayout
   StageSelfControls,
-  BgPicker,
   GIFT_EMOJIS,
   GIFT_LABELS,
   type ChatMsg,
