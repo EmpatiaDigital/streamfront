@@ -28,7 +28,6 @@ import {
   type StageParticipant,
 } from "./LiveHelpers";
 
-// ── StageLayout (nuevo componente integrado) ──────────────────────────────────
 import { StageLayout, type StageTileStream } from "./StageLayout";
 
 const BACKEND = "https://stream-72mw.onrender.com";
@@ -50,6 +49,10 @@ const RTC_CONFIG: RTCConfiguration = {
   ],
 };
 
+/**
+ * Decodifica el JWT y devuelve id + name del usuario logueado.
+ * Se usa SOLO para identificar al owner y para el nombre propio al enviar chat/gift.
+ */
 function getStoredUser(): { id: string; name: string } {
   try {
     const token = localStorage.getItem("token");
@@ -69,12 +72,22 @@ export default function LivePage() {
   const router = useRouter();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const { user, logout } = useAuth();
-  const authCtx    = useContext(AuthContext);
- const myUsername =
-  authCtx?.user?.name?.trim() ||
-  authCtx?.user?.username?.trim() ||
-  getStoredUser().name ||
-  "";
+  const authCtx = useContext(AuthContext);
+
+  /**
+   * myUsername: nombre del usuario LOGUEADO actualmente.
+   * Prioridad: JWT (fuente de verdad del backend) > contexto de auth > vacío.
+   * NO se usa para mostrar nombres de otros viewers; eso viene del servidor.
+   */
+  const myUsername = (() => {
+    const fromJwt = getStoredUser().name;
+    if (fromJwt) return fromJwt;
+    return (
+      authCtx?.user?.name?.trim() ||
+      authCtx?.user?.username?.trim() ||
+      ""
+    );
+  })();
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const localVideoRef    = useRef<HTMLVideoElement>(null);
@@ -132,7 +145,7 @@ export default function LivePage() {
   const [stageMicLocked,    setStageMicLocked]    = useState(false);
   const [stageCamLocked,    setStageCamLocked]    = useState(false);
 
-  // ── Spotlight (nuevo) ─────────────────────────────────────────────────────
+  // ── Spotlight ─────────────────────────────────────────────────────────────
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
   // ── Admin ─────────────────────────────────────────────────────────────────
@@ -187,9 +200,9 @@ export default function LivePage() {
   const tryRegisterStreamer = useCallback(() => {
     if (!socketReadyRef.current || !streamReadyRef.current) return;
     if (!socketRef.current?.connected) return;
-    const { name } = getStoredUser();
-    socketRef.current.emit("live:registerStreamer", { liveId: id, username: name });
-  }, [id]);
+    // Siempre usar el nombre del JWT para registrar al streamer
+    socketRef.current.emit("live:registerStreamer", { liveId: id, username: myUsername });
+  }, [id, myUsername]);
 
   // ── Fetch live ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -248,23 +261,23 @@ export default function LivePage() {
     const s = io(BACKEND, { auth: { token }, reconnectionDelay: 1000, reconnectionAttempts: 5 });
     socketRef.current = s;
 
-  s.on("connect", () => {
-  socketReadyRef.current = true;
-  mySocketIdRef.current  = s.id ?? "";
-  const name =
-    authCtx?.user?.name?.trim() ||
-    authCtx?.user?.username?.trim() ||
-    getStoredUser().name;
-  s.emit("live:join", { liveId: id, username: name }); // ← agregá username
-  if (isOwner) {
-    tryRegisterStreamer();
-  } else {
-    s.emit("webrtc:viewerReady", { liveId: id });
-  }
-});
+    s.on("connect", () => {
+      socketReadyRef.current = true;
+      mySocketIdRef.current  = s.id ?? "";
+      // Siempre enviar el nombre real del JWT al unirse
+      s.emit("live:join", { liveId: id, username: myUsername });
+      if (isOwner) {
+        tryRegisterStreamer();
+      } else {
+        s.emit("webrtc:viewerReady", { liveId: id });
+      }
+    });
+
     s.on("disconnect", () => { socketReadyRef.current = false; });
 
     // ── Eventos generales ─────────────────────────────────────────────────
+    // Los mensajes de chat llegan con el nombre que asignó el SERVIDOR (del JWT),
+    // nunca confiamos en el nombre que mandó el cliente.
     s.on("live:chat",        (m: ChatMsg) => setChat((p) => [...p.slice(-199), m]));
     s.on("live:viewerCount", ({ count }: { count: number }) => setViewers(count));
     s.on("live:viewerList",  ({ viewers: vl }: { viewers: ViewerInfo[] }) => setViewerList(vl));
@@ -294,19 +307,20 @@ export default function LivePage() {
           .filter((t) => ids.has(t.socketId))
           .map((t) => {
             const p = participants.find((x) => x.socketId === t.socketId);
-            return p ? { ...t, micMuted: p.micMuted, camOff: p.camOff, micLocked: p.micLocked, camLocked: p.camLocked } : t;
+            // Actualizar nombre también desde el servidor en cada stageUpdate
+            return p
+              ? { ...t, name: p.name, micMuted: p.micMuted, camOff: p.camOff, micLocked: p.micLocked, camLocked: p.camLocked }
+              : t;
           });
       });
     });
 
-    // ── Spotlight (nuevo) ─────────────────────────────────────────────────
-    // El servidor puede emitir "stage:spotlight" para sincronizar el estado
-    // entre todos los viewers cuando el owner cambia el destacado.
+    // ── Spotlight ─────────────────────────────────────────────────────────
     s.on("stage:spotlight", ({ socketId }: { socketId: string | null }) => {
       setSpotlightId(socketId);
     });
 
-    // ── Owner silencia mic del invitado ───────────────────────────────────
+    // ── Owner silencia mic/cam del invitado ───────────────────────────────
     s.on("stage:adminMuteMic", ({ mute, lock }: { mute: boolean; lock: boolean }) => {
       const stream = stageStreamRef.current;
       if (stream) stream.getAudioTracks().forEach((t) => { t.enabled = !mute; });
@@ -395,7 +409,6 @@ export default function LivePage() {
     });
 
     // ── WebRTC escenario ──────────────────────────────────────────────────
-
     s.on("stage:invited", async ({ ownerSocketId }: { ownerSocketId: string }) => {
       if (isOwner) return;
       try {
@@ -430,6 +443,7 @@ export default function LivePage() {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        // Enviar el nombre real desde el JWT, no del contexto
         s.emit("stage:offer", {
           targetSocketId: ownerSocketId,
           fromName:       myUsername,
@@ -454,6 +468,7 @@ export default function LivePage() {
         setStageTiles((prev) => {
           const exists = prev.find((t) => t.socketId === fromSocketId);
           if (exists) return prev.map((t) => t.socketId === fromSocketId ? { ...t, stream } : t);
+          // Nombre viene del servidor (fromName fue validado server-side desde el JWT)
           return [...prev, { socketId: fromSocketId, name: fromName, stream }];
         });
       };
@@ -464,7 +479,6 @@ export default function LivePage() {
         if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           stagePCsRef.current.delete(fromSocketId);
           setStageTiles((prev) => prev.filter((t) => t.socketId !== fromSocketId));
-          // Limpiar spotlight si el tile desconectado era el destacado
           setSpotlightId((prev) => (prev === fromSocketId ? null : prev));
         }
       };
@@ -539,6 +553,7 @@ export default function LivePage() {
   // ── Acciones ──────────────────────────────────────────────────────────────
   const sendChat = () => {
     if (!msg.trim() || !id) return;
+    // El servidor sobreescribe el username con el del JWT, pero lo enviamos igual
     socketRef.current?.emit("live:chat", { liveId: id, message: msg, username: myUsername });
     setMsg("");
   };
@@ -642,7 +657,6 @@ export default function LivePage() {
     stagePCsRef.current.get(socketId)?.close();
     stagePCsRef.current.delete(socketId);
     setStageTiles((prev) => prev.filter((t) => t.socketId !== socketId));
-    // Limpiar spotlight si se quita al destacado
     setSpotlightId((prev) => (prev === socketId ? null : prev));
     socketRef.current?.emit("stage:remove", { liveId: id, targetSocketId: socketId });
   };
@@ -667,7 +681,6 @@ export default function LivePage() {
     socketRef.current?.emit("stage:adminMuteCam", { liveId: id, targetSocketId: socketId, off, lock });
   };
 
-  // El viewer alterna su propio mic (solo si no está bloqueado)
   const toggleStageMic = () => {
     if (stageMicLocked) return;
     const stream = stageStreamRef.current;
@@ -695,12 +708,12 @@ export default function LivePage() {
     );
   };
 
-  // ── Spotlight: solo el owner puede cambiarlo ──────────────────────────────
-  // Si el servidor no soporta "stage:spotlight" todavía, el cambio es
-  // solo local (el owner lo ve) y puede ignorarse del lado server.
+  /**
+   * Spotlight: solo el owner puede cambiarlo.
+   * Se emite al servidor para sincronizar con TODOS los viewers.
+   */
   const handleSpotlight = (socketId: string | null) => {
     setSpotlightId(socketId);
-    // Emitir al servidor para sincronizar con los demás viewers
     socketRef.current?.emit("stage:spotlight", { liveId: id, socketId });
   };
 
@@ -790,10 +803,10 @@ export default function LivePage() {
         )}
 
         {/*
-          ══ Tiles del escenario — StageLayout reemplaza StageTilesRow ══
-          Recibe todos los props del layout avanzado:
-          - spotlight, responsive (mobile/desktop), avatares, mirroring propio,
-            controles de authority, y limpieza al desconectar.
+          StageLayout muestra los tiles del escenario.
+          - spotlightId controla cuál tile aparece grande.
+          - El tile destacado solo aparece UNA vez (la lógica de filtrado
+            está corregida en StageLayout.tsx).
         */}
         <StageLayout
           tiles={stageTiles}
