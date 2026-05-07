@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export function normalizeUser(raw: any): User {
   return {
     ...raw,
-    id: raw.id ?? raw._id,
+    id:   raw.id   ?? raw._id,
     name: raw.name?.trim() || raw.username?.trim() || "Sin nombre",
   };
 }
