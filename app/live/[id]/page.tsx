@@ -71,7 +71,11 @@ export default function LivePage() {
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   const authCtx    = useContext(AuthContext);
-  const myUsername = authCtx?.user?.name ?? authCtx?.user?.username ?? getStoredUser().name;
+ const myUsername =
+  authCtx?.user?.name?.trim() ||
+  authCtx?.user?.username?.trim() ||
+  getStoredUser().name ||
+  "Usuario";
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const localVideoRef    = useRef<HTMLVideoElement>(null);
