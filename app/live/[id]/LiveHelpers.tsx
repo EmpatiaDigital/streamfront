@@ -6,10 +6,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Mic, MicOff, Video, VideoOff, X,
-  ShoppingBag, ChevronDown, Shield, ShieldOff,
+  ShoppingBag, ChevronDown, Shield, ShieldOff, Users,
 } from "lucide-react";
 import "./helpers.css";
 import "./live.css";
+
 /* ═══════════════════════════════════════════════════════════════
    TIPOS
 ═══════════════════════════════════════════════════════════════ */
@@ -283,8 +284,8 @@ export function StagePanel({
                 <div key={p.socketId} className="live-stage-slot">
                   <span className="live-stage-slot-dot" />
                   <span className="live-stage-slot-name">
-  {p.name?.trim() || "Invitado"}
-</span>
+                    {p.name?.trim() || "Invitado"}
+                  </span>
                   <div className="live-stage-slot-controls">
                     {onMuteMic && (
                       <button
@@ -333,25 +334,56 @@ export function StagePanel({
             </div>
           )}
 
+          {/* ── Sección Admins del live ── */}
           {isOwner && viewerList.length > 0 && (
             <div className="live-stage-admin-section">
-              <p className="live-stage-admin-label">👮 Admins del live</p>
-              {viewerList.filter((v) => v.socketId).map((v) => {
-                const isAdm = adminList.includes(v.socketId!);
-                return (
-                  <div key={v.socketId} className="live-stage-admin-row">
-                    <span className="live-stage-admin-name">
-  {v.name?.trim() || "Viewer"}
-</span>
-                    <button
-                      className={`live-stage-admin-btn${isAdm ? " active" : ""}`}
-                      onClick={() => onSetAdmin?.(v.socketId!, !isAdm)}
-                    >
-                      {isAdm ? <><ShieldOff size={10} /> Quitar</> : <><Shield size={10} /> Admin</>}
-                    </button>
-                  </div>
-                );
-              })}
+
+              {/* Header de la sección */}
+              <div className="live-stage-admin-label">
+                <Users size={11} strokeWidth={2.5} />
+                <span>Admins del live</span>
+              </div>
+
+              {/* Lista de viewers como cards de usuario (estilo navbar dropdown) */}
+              <div className="live-stage-admin-list">
+                {viewerList.filter((v) => v.socketId).map((v) => {
+                  const isAdm = adminList.includes(v.socketId!);
+                  return (
+                    <div key={v.socketId} className={`live-stage-admin-card${isAdm ? " is-admin" : ""}`}>
+
+                      {/* Avatar con inicial */}
+                      <div className="live-stage-admin-avatar">
+                        {(v.name?.trim() || "?").charAt(0).toUpperCase()}
+                      </div>
+
+                      {/* Info del usuario */}
+                      <div className="live-stage-admin-info">
+                        <span className="live-stage-admin-name">
+                          {v.name?.trim() || "Viewer"}
+                        </span>
+                        {isAdm && (
+                          <span className="live-stage-admin-badge">
+                            <Shield size={8} strokeWidth={2.5} />
+                            Admin
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Botón de acción */}
+                      <button
+                        className={`live-stage-admin-action${isAdm ? " remove" : " grant"}`}
+                        onClick={() => onSetAdmin?.(v.socketId!, !isAdm)}
+                        title={isAdm ? "Quitar admin" : "Hacer admin"}
+                      >
+                        {isAdm
+                          ? <ShieldOff size={11} strokeWidth={2} />
+                          : <Shield size={11} strokeWidth={2} />
+                        }
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -368,12 +400,9 @@ export function StagePanel({
 
 /* ═══════════════════════════════════════════════════════════════
    STAGE TILE VIDEO
-   - El owner ve el video muteado (él escucha el audio via el stream WebRTC principal)
-   - Los viewers NO-owner lo escuchan (muted=false)
 ═══════════════════════════════════════════════════════════════ */
 interface StageTileVideoProps {
   stream:  MediaStream;
-  /** Si true, silencia el audio en el elemento <video> para evitar eco */
   muted:   boolean;
   camOff?: boolean;
 }
@@ -390,8 +419,6 @@ function StageTileVideo({ stream, muted, camOff }: StageTileVideoProps) {
     return () => { el.srcObject = null; };
   }, [stream, muted]);
 
-  // Cuando camOff cambia, no necesitamos reemplazar el srcObject;
-  // el track ya fue deshabilitado en origen. Solo ocultamos el video.
   return (
     <video
       ref={videoRef}
@@ -411,13 +438,11 @@ function StageTileVideo({ stream, muted, camOff }: StageTileVideoProps) {
    STAGE TILES ROW
 ═══════════════════════════════════════════════════════════════ */
 interface StageTilesRowProps {
-  tiles:      StageTileStream[];
-  /** true si quien ve esto es el owner o un admin */
+  tiles:       StageTileStream[];
   isAuthority: boolean;
-  onRemove:   (socketId: string) => void;
-  onMuteMic?: (socketId: string, mute: boolean, lock: boolean) => void;
-  onMuteCam?: (socketId: string, off: boolean, lock: boolean) => void;
-  /** socketId propio del viewer (para mutear su propia tile y evitar eco) */
+  onRemove:    (socketId: string) => void;
+  onMuteMic?:  (socketId: string, mute: boolean, lock: boolean) => void;
+  onMuteCam?:  (socketId: string, off: boolean, lock: boolean) => void;
   mySocketId?: string;
 }
 
@@ -434,7 +459,6 @@ export function StageTilesRow({
   return (
     <div className="live-stage-tiles" data-count={String(tiles.length)}>
       {tiles.map((tile) => {
-        // El viewer que emite su propio stream no se escucha a sí mismo (eco)
         const shouldMute = tile.socketId === mySocketId || isAuthority;
 
         return (
@@ -445,7 +469,6 @@ export function StageTilesRow({
               camOff={tile.camOff}
             />
 
-            {/* Placeholder cuando cam está apagada */}
             {tile.camOff && (
               <div className="live-stage-tile-cam-off">
                 <VideoOff size={18} strokeWidth={1.5} />
@@ -453,10 +476,8 @@ export function StageTilesRow({
               </div>
             )}
 
-            {/* Nombre siempre visible */}
             <span className="live-stage-tile-label">{tile.name}</span>
 
-            {/* Controles del authority (owner/admin) */}
             {isAuthority && (
               <>
                 <div className="live-stage-tile-admin">
@@ -495,7 +516,6 @@ export function StageTilesRow({
               </>
             )}
 
-            {/* Badge mic silenciado (visible para todos) */}
             {tile.micMuted && (
               <div className="live-stage-tile-muted-badge">
                 <MicOff size={9} strokeWidth={2.5} />
@@ -510,7 +530,7 @@ export function StageTilesRow({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STAGE SELF CONTROLS — controles del viewer invitado
+   STAGE SELF CONTROLS
 ═══════════════════════════════════════════════════════════════ */
 interface StageSelfControlsProps {
   micOn:       boolean;
