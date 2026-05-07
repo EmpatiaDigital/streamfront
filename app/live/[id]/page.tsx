@@ -68,7 +68,7 @@ export default function LivePage() {
   const params = useParams();
   const router = useRouter();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
-
+  const { user, logout } = useAuth();
   const authCtx    = useContext(AuthContext);
  const myUsername =
   authCtx?.user?.name?.trim() ||
