@@ -11,7 +11,6 @@ import "./live.css";
 
 import { AuthContext } from "../../context/AuthContext";
 import { BgPicker } from "../../ver/[id]/BgPicker";
-import { useAuth } from "../hooks/useAuth";
 
 import {
   ChatMessages,
