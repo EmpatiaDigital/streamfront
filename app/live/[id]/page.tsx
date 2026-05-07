@@ -96,6 +96,9 @@ export default function LivePage() {
   const peerConnsRef     = useRef<Map<string, RTCPeerConnection>>(new Map());
   const peerConnRef      = useRef<RTCPeerConnection | null>(null);
   const stagePCsRef      = useRef<Map<string, RTCPeerConnection>>(new Map());
+  // PCs que un viewer normal mantiene con cada participante del escenario
+  // key = participantSocketId
+  const viewerStagePCsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const streamReadyRef   = useRef(false);
   const socketReadyRef   = useRef(false);
   const autoPlayRetryRef = useRef<(() => void) | null>(null);
@@ -174,6 +177,8 @@ export default function LivePage() {
     peerConnRef.current = null;
     stagePCsRef.current.forEach((pc) => pc.close());
     stagePCsRef.current.clear();
+    viewerStagePCsRef.current.forEach((pc) => pc.close());
+    viewerStagePCsRef.current.clear();
     autoPlayRetryRef.current = null;
     setIsOnStage(false);
     setStageMicLocked(false);
@@ -301,16 +306,23 @@ export default function LivePage() {
       setStageParticipants(participants);
       setStageTiles((prev) => {
         const ids = new Set(participants.map((p) => p.socketId));
-        return prev
-          .filter((t) => ids.has(t.socketId))
-          .map((t) => {
-            const p = participants.find((x) => x.socketId === t.socketId);
-            // Actualizar nombre también desde el servidor en cada stageUpdate
-            return p
-              ? { ...t, name: p.name, micMuted: p.micMuted, camOff: p.camOff, micLocked: p.micLocked, camLocked: p.camLocked }
-              : t;
-          });
+        // Remover tiles cuyos participantes ya no están en escena
+        const filtered = prev.filter((t) => ids.has(t.socketId));
+        // Actualizar estado mic/cam/nombre de los que siguen
+        return filtered.map((t) => {
+          const p = participants.find((x) => x.socketId === t.socketId);
+          return p
+            ? { ...t, name: p.name, micMuted: p.micMuted, camOff: p.camOff, micLocked: p.micLocked, camLocked: p.camLocked }
+            : t;
+        });
       });
+      // También limpiar PCs de viewer↔stage que ya no están en escena
+      for (const [socketId, pc] of viewerStagePCsRef.current.entries()) {
+        if (!participants.some((p) => p.socketId === socketId)) {
+          pc.close();
+          viewerStagePCsRef.current.delete(socketId);
+        }
+      }
     });
 
     // ── Spotlight ─────────────────────────────────────────────────────────
@@ -543,6 +555,108 @@ export default function LivePage() {
       setStageCamLocked(false);
     });
 
+    // ── Escenario visible para TODOS los viewers ──────────────────────────
+    //
+    // Flujo:
+    // 1. Servidor le dice al viewer normal "stage:newParticipant" → hay alguien en escena
+    //    y le dice al participante "stage:connectToViewer" → hay un viewer que quiere verlo
+    // 2. El participante del escenario crea offer → "stage:viewerOffer" → al viewer
+    // 3. El viewer responde → "stage:viewerAnswer" → al participante
+    // 4. ICE candidates con "stage:viewerIce"
+
+    // El participante del escenario recibe aviso de que debe conectarse con un viewer
+    s.on("stage:connectToViewer", async ({ viewerSocketId }: { viewerSocketId: string }) => {
+      // Solo aplica si este socket es un participante activo del escenario
+      const stream = stageStreamRef.current;
+      if (!stream || isOwner) return;
+
+      viewerStagePCsRef.current.get(viewerSocketId)?.close();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      viewerStagePCsRef.current.set(viewerSocketId, pc);
+
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate) s.emit("stage:viewerIce", { targetSocketId: viewerSocketId, candidate });
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+          viewerStagePCsRef.current.delete(viewerSocketId);
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      s.emit("stage:viewerOffer", {
+        targetSocketId: viewerSocketId,
+        fromName:       myUsername,
+        sdp:            offer,
+      });
+    });
+
+    // El viewer normal recibe el offer del participante del escenario
+    s.on("stage:viewerOffer", async ({
+      fromSocketId, fromName, sdp,
+    }: { fromSocketId: string; fromName: string; sdp: RTCSessionDescriptionInit }) => {
+      // Solo para viewers normales (no owner, no en escenario como invitado con stageStream)
+      if (isOwner) return;
+
+      viewerStagePCsRef.current.get(fromSocketId)?.close();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      viewerStagePCsRef.current.set(fromSocketId, pc);
+
+      pc.ontrack = (e) => {
+        const stream = e.streams[0];
+        if (!stream) return;
+        // Agregar el tile del participante del escenario a la vista del viewer
+        setStageTiles((prev) => {
+          const exists = prev.find((t) => t.socketId === fromSocketId);
+          if (exists) return prev.map((t) => t.socketId === fromSocketId ? { ...t, stream } : t);
+          return [...prev, { socketId: fromSocketId, name: fromName, stream }];
+        });
+      };
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate) s.emit("stage:viewerIce", { targetSocketId: fromSocketId, candidate });
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+          viewerStagePCsRef.current.delete(fromSocketId);
+          setStageTiles((prev) => prev.filter((t) => t.socketId !== fromSocketId));
+          setSpotlightId((prev) => (prev === fromSocketId ? null : prev));
+        }
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      s.emit("stage:viewerAnswer", { targetSocketId: fromSocketId, sdp: answer });
+    });
+
+    // El participante recibe el answer del viewer
+    s.on("stage:viewerAnswer", async ({
+      fromSocketId, sdp,
+    }: { fromSocketId: string; sdp: RTCSessionDescriptionInit }) => {
+      const pc = viewerStagePCsRef.current.get(fromSocketId);
+      if (!pc || pc.signalingState !== "have-local-offer") return;
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    });
+
+    // ICE candidates viewer↔stage
+    s.on("stage:viewerIce", async ({
+      fromSocketId, candidate,
+    }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
+      try {
+        const pc = viewerStagePCsRef.current.get(fromSocketId);
+        if (pc?.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) { console.warn("stage:viewerIce error:", e); }
+    });
+
+    // Cuando el servidor notifica que hay un nuevo participante en escenario
+    // (para viewers que ya estaban conectados antes de que subiera al escenario)
+    // No necesitamos hacer nada acá porque stage:connectToViewer se le manda
+    // directamente al participante y él inicia el offer hacia el viewer.
+
     return () => {
       s.emit("live:leave", { liveId: id });
       s.disconnect();
@@ -679,6 +793,9 @@ export default function LivePage() {
   const removeFromStage = (socketId: string) => {
     stagePCsRef.current.get(socketId)?.close();
     stagePCsRef.current.delete(socketId);
+    // También cerrar la PC viewer↔stage si existe
+    viewerStagePCsRef.current.get(socketId)?.close();
+    viewerStagePCsRef.current.delete(socketId);
     setStageTiles((prev) => prev.filter((t) => t.socketId !== socketId));
     setSpotlightId((prev) => (prev === socketId ? null : prev));
     socketRef.current?.emit("stage:remove", { liveId: id, targetSocketId: socketId });
