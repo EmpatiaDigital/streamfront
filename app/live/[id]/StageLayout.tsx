@@ -126,8 +126,10 @@ export function StageLayout({
 
   // ── Render de un tile individual ──────────────────────────────────────────
   const renderTile = (tile: StageTileStream, isSpotlight = false) => {
-    // El tile propio y el authority siempre se mutean localmente para evitar eco
-    const shouldMute    = tile.socketId === mySocketId || isAuthority;
+    // Solo mutear el tile PROPIO para evitar eco.
+    // NUNCA mutear los tiles ajenos — eso silencia el audio de todos los invitados.
+    // isAuthority no tiene nada que ver con el mute local del elemento <video>.
+    const shouldMute    = tile.socketId === mySocketId;
     const isSpotlighted = tile.socketId === spotlightId;
 
     return (
