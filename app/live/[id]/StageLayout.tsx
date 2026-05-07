@@ -2,10 +2,6 @@
 
 /**
  * StageLayout.tsx
- * Componente para visualizar y controlar el escenario del live.
- * - Spotlight: el owner puede destacar un participante como principal.
- * - Responsive: máx 5 tiles en mobile, 8 en desktop.
- * - El destacado siempre ocupa el lugar principal.
  */
 
 import { useEffect, useRef, useState } from "react";
