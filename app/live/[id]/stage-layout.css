@@ -60,8 +60,8 @@
 /* Tiles más grandes en la row */
 .stage-layout-row .stage-tile {
   flex: 0 0 auto;
-  width: 160px;
-  height: 160px;
+  width: 190px;
+  height: 180px;
   border-radius: 16px;
 }
 
