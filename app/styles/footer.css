@@ -67,3 +67,31 @@
     line-height: 1.5;
   }
 }
+@media (max-width: 768px) {
+
+  .footer {
+    padding: 20px 16px;
+    overflow-x: hidden;
+  }
+
+  .footer-inner {
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+
+  /* OCULTA LINKS EN MOBILE */
+  .footer-links {
+    display: none;
+  }
+
+  .footer-brand {
+    font-size: 16px;
+    text-align: center;
+  }
+
+  .footer-copy {
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}
