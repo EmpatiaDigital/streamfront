@@ -3,6 +3,9 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin-top: 20px;
   background: #0d0d1a;
+
+  /* IMPORTANTE */
+  overflow-x: hidden;
 }
 
 .footer-inner {
@@ -33,9 +36,34 @@
   transition: color 0.2s;
 }
 
-.footer-links a:hover { color: rgba(255, 255, 255, 0.7); }
+.footer-links a:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
 
 .footer-copy {
   color: rgba(255, 255, 255, 0.25);
   font-size: 12px;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .footer {
+    padding: 24px 16px;
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .footer-links {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .footer-copy {
+    font-size: 11px;
+    line-height: 1.5;
+  }
 }
