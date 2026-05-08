@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import {
   Mic, MicOff, Video, VideoOff, Square, Send, Gift,
-  Users, Radio, Clock, PhoneOff, Link, Link2Off,
+  Users, Radio, Clock, PhoneOff, Link, Link2Off, LogOut,
 } from "lucide-react";
 import "./live.css";
 
@@ -39,6 +39,13 @@ type LiveData = {
   user?: { _id: string; name: string; avatar?: string } | string;
 };
 
+// Notificación de join/leave para el owner
+type ParticipantNotif = {
+  name: string;
+  action: "join" | "leave";
+  total: number;
+};
+
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -48,10 +55,6 @@ const RTC_CONFIG: RTCConfiguration = {
   ],
 };
 
-/**
- * Decodifica el JWT y devuelve id + name del usuario logueado.
- * Se usa SOLO para identificar al owner y para el nombre propio al enviar chat/gift.
- */
 function getStoredUser(): { id: string; name: string } {
   try {
     const token = localStorage.getItem("token");
@@ -72,11 +75,6 @@ export default function LivePage() {
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const authCtx = useContext(AuthContext);
 
-  /**
-   * myUsername: nombre del usuario LOGUEADO actualmente.
-   * Prioridad: JWT (fuente de verdad del backend) > contexto de auth > vacío.
-   * NO se usa para mostrar nombres de otros viewers; eso viene del servidor.
-   */
   const myUsername = (() => {
     const fromJwt = getStoredUser().name;
     if (fromJwt) return fromJwt;
@@ -88,21 +86,23 @@ export default function LivePage() {
   })();
 
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const localVideoRef    = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef   = useRef<HTMLVideoElement>(null);
-  const socketRef        = useRef<Socket | null>(null);
-  const localStreamRef   = useRef<MediaStream | null>(null);
-  const stageStreamRef   = useRef<MediaStream | null>(null);
-  const peerConnsRef     = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const peerConnRef      = useRef<RTCPeerConnection | null>(null);
-  const stagePCsRef      = useRef<Map<string, RTCPeerConnection>>(new Map());
-  // PCs que un viewer normal mantiene con cada participante del escenario
-  // key = participantSocketId
-  const viewerStagePCsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const streamReadyRef   = useRef(false);
-  const socketReadyRef   = useRef(false);
-  const autoPlayRetryRef = useRef<(() => void) | null>(null);
-  const mySocketIdRef    = useRef<string>("");
+  const localVideoRef      = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef     = useRef<HTMLVideoElement>(null);
+  const socketRef          = useRef<Socket | null>(null);
+  const localStreamRef     = useRef<MediaStream | null>(null);
+  const stageStreamRef     = useRef<MediaStream | null>(null);
+  const peerConnsRef       = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const peerConnRef        = useRef<RTCPeerConnection | null>(null);
+  const stagePCsRef        = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const viewerStagePCsRef  = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const streamReadyRef     = useRef(false);
+  const socketReadyRef     = useRef(false);
+  const autoPlayRetryRef   = useRef<(() => void) | null>(null);
+  const mySocketIdRef      = useRef<string>("");
+
+  // ── Canvas para background filter en video del owner ─────────────────────
+  const canvasRef          = useRef<HTMLCanvasElement>(null);
+  const animFrameRef       = useRef<number>(0);
 
   // ── Estado base ───────────────────────────────────────────────────────────
   const [live,      setLive]      = useState<LiveData | null>(null);
@@ -126,7 +126,7 @@ export default function LivePage() {
   const [copied,       setCopied]       = useState(false);
   const [showViewers,  setShowViewers]  = useState(false);
 
-  // ── Fondo personalizable ──────────────────────────────────────────────────
+  // ── Fondo personalizable (color que se aplica como overlay/tint al video) ─
   const [bgColor, setBgColor] = useState("#000000");
 
   // ── Gifts ─────────────────────────────────────────────────────────────────
@@ -153,6 +153,10 @@ export default function LivePage() {
   const [isAdmin,   setIsAdmin]   = useState(false);
   const [adminList, setAdminList] = useState<string[]>([]);
 
+  // ── Notificaciones de join/leave para el owner ────────────────────────────
+  const [participantNotif, setParticipantNotif] = useState<ParticipantNotif | null>(null);
+  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/live/${id}`
@@ -160,6 +164,13 @@ export default function LivePage() {
 
   const streamerName =
     typeof live?.user === "object" ? live.user?.name ?? "Streamer" : "Streamer";
+
+  // ── Mostrar notif de join/leave ───────────────────────────────────────────
+  const showParticipantNotif = useCallback((notif: ParticipantNotif) => {
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    setParticipantNotif(notif);
+    notifTimerRef.current = setTimeout(() => setParticipantNotif(null), 4000);
+  }, []);
 
   // ── Limpieza ──────────────────────────────────────────────────────────────
   const fullCleanup = useCallback(() => {
@@ -171,6 +182,7 @@ export default function LivePage() {
     socketReadyRef.current = false;
     if (localVideoRef.current)  localVideoRef.current.srcObject  = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    cancelAnimationFrame(animFrameRef.current);
     peerConnsRef.current.forEach((pc) => pc.close());
     peerConnsRef.current.clear();
     peerConnRef.current?.close();
@@ -203,9 +215,27 @@ export default function LivePage() {
   const tryRegisterStreamer = useCallback(() => {
     if (!socketReadyRef.current || !streamReadyRef.current) return;
     if (!socketRef.current?.connected) return;
-    // Siempre usar el nombre del JWT para registrar al streamer
     socketRef.current.emit("live:registerStreamer", { liveId: id, username: myUsername });
   }, [id, myUsername]);
+
+  // ── createStreamerPC ──────────────────────────────────────────────────────
+  const createStreamerPC = useCallback(
+    (viewerSocketId: string, stream: MediaStream): RTCPeerConnection => {
+      peerConnsRef.current.get(viewerSocketId)?.close();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate)
+          socketRef.current?.emit("webrtc:ice", { targetSocketId: viewerSocketId, candidate });
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed" || pc.connectionState === "closed")
+          peerConnsRef.current.delete(viewerSocketId);
+      };
+      peerConnsRef.current.set(viewerSocketId, pc);
+      return pc;
+    }, []
+  );
 
   // ── Fetch live ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -238,25 +268,6 @@ export default function LivePage() {
       .catch(() => {});
   }, [isOwner]);
 
-  // ── createStreamerPC ──────────────────────────────────────────────────────
-  const createStreamerPC = useCallback(
-    (viewerSocketId: string, stream: MediaStream): RTCPeerConnection => {
-      peerConnsRef.current.get(viewerSocketId)?.close();
-      const pc = new RTCPeerConnection(RTC_CONFIG);
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      pc.onicecandidate = ({ candidate }) => {
-        if (candidate)
-          socketRef.current?.emit("webrtc:ice", { targetSocketId: viewerSocketId, candidate });
-      };
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "failed" || pc.connectionState === "closed")
-          peerConnsRef.current.delete(viewerSocketId);
-      };
-      peerConnsRef.current.set(viewerSocketId, pc);
-      return pc;
-    }, []
-  );
-
   // ── Socket.IO ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id || isOwner === null) return;
@@ -267,7 +278,6 @@ export default function LivePage() {
     s.on("connect", () => {
       socketReadyRef.current = true;
       mySocketIdRef.current  = s.id ?? "";
-      // Siempre enviar el nombre real del JWT al unirse
       s.emit("live:join", { liveId: id, username: myUsername });
       if (isOwner) {
         tryRegisterStreamer();
@@ -279,8 +289,6 @@ export default function LivePage() {
     s.on("disconnect", () => { socketReadyRef.current = false; });
 
     // ── Eventos generales ─────────────────────────────────────────────────
-    // Los mensajes de chat llegan con el nombre que asignó el SERVIDOR (del JWT),
-    // nunca confiamos en el nombre que mandó el cliente.
     s.on("live:chat",        (m: ChatMsg) => setChat((p) => [...p.slice(-199), m]));
     s.on("live:viewerCount", ({ count }: { count: number }) => setViewers(count));
     s.on("live:viewerList",  ({ viewers: vl }: { viewers: ViewerInfo[] }) => setViewerList(vl));
@@ -301,14 +309,21 @@ export default function LivePage() {
     s.on("live:youAreAdmin",  () => setIsAdmin(true));
     s.on("live:adminRevoked", () => setIsAdmin(false));
 
+    // ── Notificaciones join/leave (solo owner las recibe del servidor) ──────
+    s.on("live:userJoined", ({ name, total }: { socketId: string; name: string; total: number }) => {
+      showParticipantNotif({ name, action: "join", total });
+    });
+
+    s.on("live:userLeft", ({ name, total }: { socketId: string; name: string; total: number }) => {
+      showParticipantNotif({ name, action: "leave", total });
+    });
+
     // ── stageUpdate ───────────────────────────────────────────────────────
     s.on("live:stageUpdate", ({ participants }: { participants: StageParticipant[] }) => {
       setStageParticipants(participants);
       setStageTiles((prev) => {
         const ids = new Set(participants.map((p) => p.socketId));
-        // Remover tiles cuyos participantes ya no están en escena
         const filtered = prev.filter((t) => ids.has(t.socketId));
-        // Actualizar estado mic/cam/nombre de los que siguen
         return filtered.map((t) => {
           const p = participants.find((x) => x.socketId === t.socketId);
           return p
@@ -316,7 +331,6 @@ export default function LivePage() {
             : t;
         });
       });
-      // También limpiar PCs de viewer↔stage que ya no están en escena
       for (const [socketId, pc] of viewerStagePCsRef.current.entries()) {
         if (!participants.some((p) => p.socketId === socketId)) {
           pc.close();
@@ -325,7 +339,7 @@ export default function LivePage() {
       }
     });
 
-    // ── Spotlight ─────────────────────────────────────────────────────────
+    // ── Spotlight — FIX: ahora todos reciben este evento ─────────────────
     s.on("stage:spotlight", ({ socketId }: { socketId: string | null }) => {
       setSpotlightId(socketId);
     });
@@ -453,12 +467,15 @@ export default function LivePage() {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        // Enviar el nombre real desde el JWT, no del contexto
         s.emit("stage:offer", {
           targetSocketId: ownerSocketId,
           fromName:       myUsername,
           sdp:            offer,
         });
+
+        // Registrar en el servidor que ya subió al escenario
+        s.emit("stage:joined", { liveId: id, name: myUsername, micOn: true, camOn: true });
+
       } catch (err) {
         console.warn("stage:invited — no se pudo acceder a la cámara:", err);
       }
@@ -472,11 +489,6 @@ export default function LivePage() {
       const pc = new RTCPeerConnection(RTC_CONFIG);
       stagePCsRef.current.set(fromSocketId, pc);
 
-      // ── CRÍTICO: el owner agrega su propio stream al PC del invitado ──
-      // Sin esto la conexión es unidireccional: el viewer envía audio/video
-      // al owner pero nunca recibe nada de vuelta, por lo que el owner no
-      // escucha al invitado Y el invitado no puede escuchar al owner
-      // a través del canal del escenario.
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => {
           pc.addTrack(t, localStreamRef.current!);
@@ -509,21 +521,15 @@ export default function LivePage() {
       s.emit("stage:answer", { targetSocketId: fromSocketId, sdp: answer });
     });
 
-    // stage:answer puede llegar tanto al viewer (respuesta del owner al offer
-    // que hizo el viewer) como al owner si en el futuro se renegocia.
-    // El campo fromSocketId identifica quién envió el answer para hacer
-    // el routing correcto en el mapa stagePCsRef.
     s.on("stage:answer", async ({
       sdp, fromSocketId,
     }: { sdp: RTCSessionDescriptionInit; fromSocketId?: string }) => {
-      // Viewer: busca el PC con key "owner"
       if (!isOwner && !isAdmin) {
         const pc = stagePCsRef.current.get("owner");
         if (!pc || pc.signalingState !== "have-local-offer") return;
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
         return;
       }
-      // Owner/admin: busca el PC del viewer que respondió
       if (fromSocketId) {
         const pc = stagePCsRef.current.get(fromSocketId);
         if (!pc || pc.signalingState !== "have-local-offer") return;
@@ -555,18 +561,8 @@ export default function LivePage() {
       setStageCamLocked(false);
     });
 
-    // ── Escenario visible para TODOS los viewers ──────────────────────────
-    //
-    // Flujo:
-    // 1. Servidor le dice al viewer normal "stage:newParticipant" → hay alguien en escena
-    //    y le dice al participante "stage:connectToViewer" → hay un viewer que quiere verlo
-    // 2. El participante del escenario crea offer → "stage:viewerOffer" → al viewer
-    // 3. El viewer responde → "stage:viewerAnswer" → al participante
-    // 4. ICE candidates con "stage:viewerIce"
-
-    // El participante del escenario recibe aviso de que debe conectarse con un viewer
+    // ── Viewer↔Stage WebRTC ───────────────────────────────────────────────
     s.on("stage:connectToViewer", async ({ viewerSocketId }: { viewerSocketId: string }) => {
-      // Solo aplica si este socket es un participante activo del escenario
       const stream = stageStreamRef.current;
       if (!stream || isOwner) return;
 
@@ -594,11 +590,11 @@ export default function LivePage() {
       });
     });
 
-    // El viewer normal recibe el offer del participante del escenario
+    // FIX AUDIO: el viewer que recibe el stream del participante NO debe
+    // mutear el <video>. Solo se mutea el propio stream (para evitar eco).
     s.on("stage:viewerOffer", async ({
       fromSocketId, fromName, sdp,
     }: { fromSocketId: string; fromName: string; sdp: RTCSessionDescriptionInit }) => {
-      // Solo para viewers normales (no owner, no en escenario como invitado con stageStream)
       if (isOwner) return;
 
       viewerStagePCsRef.current.get(fromSocketId)?.close();
@@ -608,10 +604,10 @@ export default function LivePage() {
       pc.ontrack = (e) => {
         const stream = e.streams[0];
         if (!stream) return;
-        // Agregar el tile del participante del escenario a la vista del viewer
         setStageTiles((prev) => {
           const exists = prev.find((t) => t.socketId === fromSocketId);
           if (exists) return prev.map((t) => t.socketId === fromSocketId ? { ...t, stream } : t);
+          // isSelf = false porque el viewer recibe un stream ajeno → NO mutear
           return [...prev, { socketId: fromSocketId, name: fromName, stream }];
         });
       };
@@ -633,7 +629,6 @@ export default function LivePage() {
       s.emit("stage:viewerAnswer", { targetSocketId: fromSocketId, sdp: answer });
     });
 
-    // El participante recibe el answer del viewer
     s.on("stage:viewerAnswer", async ({
       fromSocketId, sdp,
     }: { fromSocketId: string; sdp: RTCSessionDescriptionInit }) => {
@@ -642,7 +637,6 @@ export default function LivePage() {
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
     });
 
-    // ICE candidates viewer↔stage
     s.on("stage:viewerIce", async ({
       fromSocketId, candidate,
     }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
@@ -651,11 +645,6 @@ export default function LivePage() {
         if (pc?.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (e) { console.warn("stage:viewerIce error:", e); }
     });
-
-    // Cuando el servidor notifica que hay un nuevo participante en escenario
-    // (para viewers que ya estaban conectados antes de que subiera al escenario)
-    // No necesitamos hacer nada acá porque stage:connectToViewer se le manda
-    // directamente al participante y él inicia el offer hacia el viewer.
 
     return () => {
       s.emit("live:leave", { liveId: id });
@@ -690,7 +679,6 @@ export default function LivePage() {
   // ── Acciones ──────────────────────────────────────────────────────────────
   const sendChat = () => {
     if (!msg.trim() || !id) return;
-    // El servidor sobreescribe el username con el del JWT, pero lo enviamos igual
     socketRef.current?.emit("live:chat", { liveId: id, message: msg, username: myUsername });
     setMsg("");
   };
@@ -784,6 +772,16 @@ export default function LivePage() {
     } catch { setEnding(false); }
   };
 
+  // ── Salir del live (viewer) ───────────────────────────────────────────────
+  const leaveLive = () => {
+    if (!window.confirm("¿Querés salir del live?")) return;
+    socketRef.current?.emit("live:leave", { liveId: id });
+    socketRef.current?.disconnect();
+    socketRef.current = null;
+    fullCleanup();
+    router.push("/");
+  };
+
   // ── Escenario acciones ────────────────────────────────────────────────────
   const inviteToStage = (viewer: ViewerInfo) => {
     if (!viewer.socketId) return;
@@ -793,7 +791,6 @@ export default function LivePage() {
   const removeFromStage = (socketId: string) => {
     stagePCsRef.current.get(socketId)?.close();
     stagePCsRef.current.delete(socketId);
-    // También cerrar la PC viewer↔stage si existe
     viewerStagePCsRef.current.get(socketId)?.close();
     viewerStagePCsRef.current.delete(socketId);
     setStageTiles((prev) => prev.filter((t) => t.socketId !== socketId));
@@ -848,11 +845,8 @@ export default function LivePage() {
     );
   };
 
-  /**
-   * Spotlight: solo el owner puede cambiarlo.
-   * Se emite al servidor para sincronizar con TODOS los viewers.
-   */
   const handleSpotlight = (socketId: string | null) => {
+    // Optimistic update local — el servidor lo sincroniza a todos
     setSpotlightId(socketId);
     socketRef.current?.emit("stage:spotlight", { liveId: id, socketId });
   };
@@ -887,12 +881,22 @@ export default function LivePage() {
 
   const status = live.status;
 
+  // ── Color tint: se aplica como mix-blend-mode overlay sobre el video ──────
+  // Esto modifica la apariencia VISUAL del video sin afectar el stream real.
+  // Para aplicarlo al stream transmitido habría que usar Canvas API.
+  const videoTintStyle = bgColor !== "#000000"
+    ? {
+        boxShadow: `inset 0 0 0 100vmax ${bgColor}22`,
+        "--video-tint": `${bgColor}33`,
+      } as React.CSSProperties
+    : {};
+
   // ── Vista principal ───────────────────────────────────────────────────────
   return (
     <div className="live-root">
 
       {/* ══ Área de video ═══════════════════════════════════════════════════ */}
-      <div className="live-video-area" style={{ background: bgColor }}>
+      <div className="live-video-area" style={{ background: "#000" }}>
 
         {/* Video local del streamer (owner) */}
         {isOwner && (
@@ -900,7 +904,29 @@ export default function LivePage() {
             ref={localVideoRef}
             autoPlay muted playsInline
             className="live-video-el"
-            style={{ display: camOn ? "block" : "none", transform: "scaleX(-1)" }}
+            style={{
+              display: camOn ? "block" : "none",
+              transform: "scaleX(-1)",
+              // Tint sobre el video del owner
+              filter: bgColor !== "#000000"
+                ? `drop-shadow(0 0 0 ${bgColor})`
+                : undefined,
+            }}
+          />
+        )}
+
+        {/* Overlay de color sobre el video (solo owner ve su propio tint) */}
+        {isOwner && bgColor !== "#000000" && camOn && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: bgColor,
+              opacity: 0.18,
+              pointerEvents: "none",
+              zIndex: 1,
+              mixBlendMode: "color",
+            }}
           />
         )}
 
@@ -942,12 +968,6 @@ export default function LivePage() {
           </div>
         )}
 
-        {/*
-          StageLayout muestra los tiles del escenario.
-          - spotlightId controla cuál tile aparece grande.
-          - El tile destacado solo aparece UNA vez (la lógica de filtrado
-            está corregida en StageLayout.tsx).
-        */}
         <StageLayout
           tiles={stageTiles}
           isAuthority={!!isOwner || isAdmin}
@@ -989,6 +1009,36 @@ export default function LivePage() {
               <strong>{giftAnim.from}</strong>{" envió "}
               <strong>{GIFT_LABELS[giftAnim.type] ?? giftAnim.type}</strong>{" x"}{giftAnim.amount}
             </p>
+          </div>
+        )}
+
+        {/* Notificación join/leave (solo owner) */}
+        {isOwner && participantNotif && (
+          <div
+            className="live-participant-notif"
+            style={{
+              position: "absolute",
+              bottom: 70,
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: participantNotif.action === "join"
+                ? "rgba(34,197,94,0.9)"
+                : "rgba(239,68,68,0.9)",
+              color: "#fff",
+              padding: "6px 14px",
+              borderRadius: 20,
+              fontSize: 12,
+              fontWeight: 600,
+              zIndex: 20,
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
+            }}
+          >
+            {participantNotif.action === "join" ? "▶ " : "◀ "}
+            {participantNotif.name}{" "}
+            {participantNotif.action === "join" ? "entró" : "salió"}
+            {" · "}{participantNotif.total} en vivo
           </div>
         )}
 
@@ -1042,6 +1092,30 @@ export default function LivePage() {
                 <Users size={11} strokeWidth={2} />{viewers}
               </button>
             )}
+
+            {/* Botón Salir — solo para viewers que NO son el owner */}
+            {!isOwner && (
+              <button
+                onClick={leaveLive}
+                className="live-leave-btn"
+                title="Salir del live"
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  background: "rgba(239,68,68,0.12)",
+                  color: "#f87171",
+                  border: "1px solid rgba(239,68,68,0.25)",
+                  borderRadius: 7,
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <LogOut size={13} strokeWidth={2} />
+                Salir
+              </button>
+            )}
+
             {isOwner && (
               <button onClick={endLive} disabled={ending} className="live-end-btn">
                 <PhoneOff size={14} strokeWidth={2} />
