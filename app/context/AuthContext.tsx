@@ -1,4 +1,4 @@
-// app/context/AuthContext.tsx
+
 "use client";
 import { createContext, useEffect, useState, ReactNode } from "react";
 import { AuthContextType, User } from "../types/auth";
@@ -17,14 +17,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const res = await fetch("https://stream-72mw.onrender.com/api/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         if (!res.ok) {
           localStorage.removeItem("token");
           return;
         }
-
         const data = await res.json();
-        // Map _id → id so the rest of the app always uses user.id
+
+        // 🔍 DEBUG — borrá esta línea una vez que confirmes que el avatar llega
+        console.log("🔍 RAW USER from /me:", JSON.stringify(data.user, null, 2));
+
         setUser(normalizeUser(data.user));
       } catch {
         localStorage.removeItem("token");
@@ -46,11 +47,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// ─── Utility: normalize MongoDB _id → id ───
+// ─── Utility: normalize MongoDB _id → id ─────────────────────────────────────
 export function normalizeUser(raw: any): User {
+  // El campo avatar puede venir como "avatar", "avatarUrl", "profileImage", etc.
+  // Mapeamos explícitamente todos los candidatos para no perder ninguno.
+  const avatar =
+    raw.avatar       ||
+    raw.avatarUrl    ||
+    raw.profileImage ||
+    raw.photo        ||
+    undefined;
+
   return {
     ...raw,
-    id:   raw.id   ?? raw._id,
-    name: raw.name?.trim() || raw.username?.trim() || "Sin nombre",
+    id:     raw.id     ?? raw._id,
+    name:   raw.name?.trim() || raw.username?.trim() || "Sin nombre",
+    avatar, // ← mapeo explícito, sobreescribe el ...raw si vino con otro nombre
   };
 }
