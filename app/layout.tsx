@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     siteName: "TalentStreaming",
     images: [
       {
-        url: "/og-image.png",
+        url: "./og-image.png",
         width: 1200,
         height: 630,
         alt: "TalentStreaming — Descubre Talentos",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "TalentStreaming — Descubre Talentos",
     description: "Mira, anima y sube a la cima.",
-    images: ["/og-image.png"],
+    images: ["./og-image.png"],
   },
 };
 
