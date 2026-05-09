@@ -9,7 +9,7 @@ import Providers from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TalentStream — Descubre Talentos",
+  title: "TalentStreaming — Descubre Talentos",
   description: "Mira, anima y sube a la cima.",
 };
 
