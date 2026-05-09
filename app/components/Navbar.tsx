@@ -150,6 +150,44 @@ function NavbarLiveButton() {
   );
 }
 
+// ─── Avatar helper ────────────────────────────────────────────────────────────
+
+function UserAvatar({
+  name,
+  avatar,
+  size = "normal",
+}: {
+  name?: string;
+  avatar?: string;
+  size?: "normal" | "large";
+}) {
+  return (
+    <div className={`nav-avatar${size === "large" ? " large" : ""}`}>
+      {avatar ? (
+        <img
+          src={avatar}
+          alt={name ?? "avatar"}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            borderRadius: "50%",
+            display: "block",
+          }}
+          onError={(e) => {
+            // Si la imagen falla, oculta el img y muestra la inicial via CSS
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+            const parent = (e.currentTarget as HTMLImageElement).parentElement;
+            if (parent) parent.dataset.fallback = name?.charAt(0).toUpperCase() ?? "?";
+          }}
+        />
+      ) : (
+        name?.charAt(0).toUpperCase()
+      )}
+    </div>
+  );
+}
+
 // ─── Navbar principal ────────────────────────────────────────────────────────
 
 export default function Navbar() {
@@ -209,7 +247,8 @@ export default function Navbar() {
 
               <div className="nav-user-wrapper">
                 <button className="nav-user-btn" onClick={() => setDropdownOpen((o) => !o)}>
-                  <div className="nav-avatar">{user.name?.charAt(0).toUpperCase()}</div>
+                  {/* ── Avatar desktop ── */}
+                  <UserAvatar name={user.name} avatar={user.avatar} />
                   <span className="nav-username">{user.name}</span>
                   <ChevronDown size={14} className={`nav-chevron ${dropdownOpen ? "open" : ""}`} />
                 </button>
@@ -256,7 +295,8 @@ export default function Navbar() {
       <div className={`nav-mobile-menu ${menuOpen ? "open" : ""}`}>
         {user && (
           <div className="nav-mobile-user">
-            <div className="nav-avatar large">{user.name?.charAt(0).toUpperCase()}</div>
+            {/* ── Avatar mobile ── */}
+            <UserAvatar name={user.name} avatar={user.avatar} size="large" />
             <div>
               <p className="nav-mobile-name">{user.name}</p>
               <p className="nav-mobile-email">{user.email}</p>
@@ -344,6 +384,11 @@ export default function Navbar() {
         @keyframes go-live-blink {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.3; }
+        }
+
+        /* Fallback text cuando el img falla */
+        .nav-avatar[data-fallback]::after {
+          content: attr(data-fallback);
         }
       `}</style>
     </>
