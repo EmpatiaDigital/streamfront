@@ -1,11 +1,12 @@
 // app/profile/[id]/page.tsx
 "use client";
-import { useState, useEffect, useRef, useContext } from "react";
+import { useState, useEffect, useRef, useContext, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Heart, Bell, BellOff, Mail, Phone, Settings, X,
   Video, Image, Calendar, MapPin, Eye, EyeOff,
-  Upload, Trash2, Save, Palette, User, Lock, AtSign, CheckCircle, AlertCircle
+  Upload, Trash2, Save, Palette, User, Lock, AtSign,
+  CheckCircle, AlertCircle, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/profile.css";
@@ -16,17 +17,14 @@ import "../../styles/theme4.css";
 import "../../styles/mystyles.css";
 
 const API    = "https://stream-72mw.onrender.com/api";
-const STATIC = "https://stream-72mw.onrender.com";          // base for /uploads/ images
+const STATIC = "https://stream-72mw.onrender.com";
 const FALLBACK_AVATAR = "/images/preview.png";
 const FALLBACK_BANNER = "/images/preview.png";
 
-// ─── Resolve image URL ───────────────────────────────────────────────────────
-// Paths from the DB look like "/uploads/1234567890.jpg"
-// We need to prepend the backend origin so the browser fetches from port 4000.
 function imgUrl(path: string | undefined | null, fallback: string): string {
   if (!path || path === fallback) return fallback;
-  if (path.startsWith("http"))   return path;   // already absolute (e.g. Cloudinary)
-  return `${STATIC}${path}`;                    // "/uploads/x.jpg" → "https://stream-72mw.onrender.com/uploads/x.jpg"
+  if (path.startsWith("http")) return path;
+  return `${STATIC}${path}`;
 }
 
 const THEMES = [
@@ -45,20 +43,158 @@ const TABS = [
 
 type Toast = { msg: string; ok: boolean } | null;
 
+// ─── Mobile Slider ──────────────────────────────────────────────────────────
+interface MobileSliderProps {
+  posts: any[];
+  me: any;
+  isOwner: boolean;
+  onLike: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+function MobileSlider({ posts, me, isOwner, onLike, onDelete }: MobileSliderProps) {
+  const [current, setCurrent] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Touch swipe
+  const touchStartX = useRef(0);
+  const touchEndX   = useRef(0);
+
+  const goTo = useCallback((idx: number) => {
+    const clamped = Math.max(0, Math.min(idx, posts.length - 1));
+    setCurrent(clamped);
+    if (trackRef.current) {
+      trackRef.current.style.transform = `translateX(-${clamped * 100}%)`;
+    }
+  }, [posts.length]);
+
+  // Reset al cambiar el tab (posts cambia)
+  useEffect(() => {
+    setCurrent(0);
+    if (trackRef.current) {
+      trackRef.current.style.transform = "translateX(0%)";
+    }
+  }, [posts]);
+
+  if (posts.length === 0) {
+    return (
+      <p style={{
+        color: "var(--text-muted)", textAlign: "center",
+        padding: "48px 24px", fontSize: 14,
+      }}>
+        No hay contenido en esta sección.
+      </p>
+    );
+  }
+
+  const liked = (post: any) =>
+    Array.isArray(post.likes) && post.likes.includes(me?.id);
+
+  return (
+    <div className="profile-grid-slider">
+      {/* Track deslizable */}
+      <div style={{ overflow: "hidden", width: "100%" }}>
+        <div
+          ref={trackRef}
+          className="profile-grid-track"
+          onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+          onTouchEnd={(e) => {
+            touchEndX.current = e.changedTouches[0].clientX;
+            const diff = touchStartX.current - touchEndX.current;
+            if (Math.abs(diff) > 40) {
+              goTo(diff > 0 ? current + 1 : current - 1);
+            }
+          }}
+        >
+          {posts.map((post) => (
+            <div key={post._id} className="profile-card">
+              <img
+                className="profile-card-thumb"
+                src={imgUrl(post.thumbnail, FALLBACK_AVATAR)}
+                alt={post.title}
+              />
+              <div className="profile-card-body">
+                <p className="profile-card-title">{post.title}</p>
+                {post.description && (
+                  <p className="profile-card-desc">{post.description}</p>
+                )}
+                <div className="profile-card-actions">
+                  <button
+                    className={`btn-like ${liked(post) ? "liked" : ""}`}
+                    onClick={() => onLike(post._id)}
+                  >
+                    <Heart size={13} fill={liked(post) ? "#ef4444" : "none"} />
+                    {(post.likes ?? []).length}
+                  </button>
+                  {isOwner && (
+                    <button className="btn-delete" onClick={() => onDelete(post._id)}>
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Controles: flechas + contador */}
+      {posts.length > 1 && (
+        <>
+          <div className="slider-arrows" style={{ padding: "12px 16px 4px" }}>
+            <button
+              className="slider-arrow"
+              onClick={() => goTo(current - 1)}
+              disabled={current === 0}
+              aria-label="Anterior"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="slider-counter">
+              {current + 1} / {posts.length}
+            </span>
+            <button
+              className="slider-arrow"
+              onClick={() => goTo(current + 1)}
+              disabled={current === posts.length - 1}
+              aria-label="Siguiente"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          {/* Dots */}
+          <div className="slider-dots">
+            {posts.map((_, i) => (
+              <button
+                key={i}
+                className={`slider-dot ${i === current ? "active" : ""}`}
+                onClick={() => goTo(i)}
+                aria-label={`Ir a ${i + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Page principal ──────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const { id } = useParams();
   const { user: me } = useContext(AuthContext)!;
   const router = useRouter();
 
-  const [profile, setProfile]     = useState<any>(null);
-  const [posts, setPosts]         = useState<any[]>([]);
-  const [tab, setTab]             = useState("videos");
+  const [profile, setProfile]       = useState<any>(null);
+  const [posts, setPosts]           = useState<any[]>([]);
+  const [tab, setTab]               = useState("videos");
   const [subscribed, setSubscribed] = useState(false);
-  const [subCount, setSubCount]   = useState(0);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [subCount, setSubCount]     = useState(0);
+  const [settingsOpen, setSettingsOpen]         = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState("profile");
-  const [saving, setSaving]       = useState(false);
-  const [toast, setToast]         = useState<Toast>(null);
+  const [saving, setSaving]         = useState(false);
+  const [toast, setToast]           = useState<Toast>(null);
 
   // Settings form
   const [sName,         setSName]         = useState("");
@@ -93,7 +229,6 @@ export default function ProfilePage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Populate settings form AND previews from a user object
   const syncFormFromProfile = (user: any) => {
     setSName(user.name ?? "");
     setSUsername(user.username ?? "");
@@ -106,14 +241,13 @@ export default function ProfilePage() {
     setSCustom(user.customStyles ?? {
       accent: "#a855f7", accent2: "#ec4899", bg: "#0d0d1a", text: "#ffffff",
     });
-    // ✅ Resolve full URL — previews in the settings modal load correctly
     setAvatarPreview(imgUrl(user.avatar, FALLBACK_AVATAR));
     setBannerPreview(imgUrl(user.banner, FALLBACK_BANNER));
     setAvatarFile(null);
     setBannerFile(null);
   };
 
-  // ─── Load profile ────────────────────────────────────────────────────────
+  // ─── Load profile ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
     fetch(`${API}/profile/${id}`)
@@ -121,24 +255,17 @@ export default function ProfilePage() {
       .then((data) => {
         const user        = data?.user ?? data;
         const fetchedPosts: any[] = Array.isArray(data?.posts) ? data.posts : [];
-
-        if (!user || typeof user !== "object" || !user._id) {
-          console.error("Respuesta inesperada:", data);
-          return;
-        }
-
+        if (!user || typeof user !== "object" || !user._id) return;
         setProfile(user);
         setPosts(fetchedPosts);
         setSubCount(Array.isArray(user.subscribers) ? user.subscribers.length : 0);
-        setSubscribed(
-          Array.isArray(user.subscribers) ? user.subscribers.includes(me?.id) : false
-        );
+        setSubscribed(Array.isArray(user.subscribers) ? user.subscribers.includes(me?.id) : false);
         syncFormFromProfile(user);
       })
       .catch((err) => console.error("Error al cargar perfil:", err));
   }, [id]);
 
-  // ─── Subscribe / Unsubscribe ─────────────────────────────────────────────
+  // ─── Subscribe ─────────────────────────────────────────────────────────────
   const handleSubscribe = async () => {
     if (!me) return router.push("/login");
     try {
@@ -151,7 +278,7 @@ export default function ProfilePage() {
     } catch (err) { console.error(err); }
   };
 
-  // ─── Like / Unlike ───────────────────────────────────────────────────────
+  // ─── Like ──────────────────────────────────────────────────────────────────
   const handleLike = async (postId: string) => {
     if (!me) return router.push("/login");
     try {
@@ -174,7 +301,7 @@ export default function ProfilePage() {
     } catch (err) { console.error(err); }
   };
 
-  // ─── Delete post ─────────────────────────────────────────────────────────
+  // ─── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (postId: string) => {
     try {
       await fetch(`${API}/profile/post/${postId}`, {
@@ -184,7 +311,7 @@ export default function ProfilePage() {
     } catch (err) { console.error(err); }
   };
 
-  // ─── Save profile ────────────────────────────────────────────────────────
+  // ─── Save profile ──────────────────────────────────────────────────────────
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
@@ -207,14 +334,8 @@ export default function ProfilePage() {
         body: form,
       });
       const data = await res.json();
-
       if (!res.ok) { showToast(data.error ?? "Error al guardar", false); return; }
-
-      if (data.user) {
-        setProfile(data.user);
-        syncFormFromProfile(data.user);  // ✅ previews update with correct backend URL
-      }
-
+      if (data.user) { setProfile(data.user); syncFormFromProfile(data.user); }
       showToast("¡Perfil actualizado!", true);
       setSettingsOpen(false);
     } catch (err) {
@@ -225,7 +346,7 @@ export default function ProfilePage() {
     }
   };
 
-  // ─── Change password ─────────────────────────────────────────────────────
+  // ─── Change password ───────────────────────────────────────────────────────
   const handleSavePassword = async () => {
     if (!sCurrPass || !sNewPass) return;
     setSaving(true);
@@ -247,11 +368,11 @@ export default function ProfilePage() {
     }
   };
 
-  // ─── File picker ─────────────────────────────────────────────────────────
+  // ─── File picker ───────────────────────────────────────────────────────────
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "avatar" | "banner") => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const blobUrl = URL.createObjectURL(file);  // local preview before upload
+    const blobUrl = URL.createObjectURL(file);
     if (type === "avatar") { setAvatarFile(file); setAvatarPreview(blobUrl); }
     else                   { setBannerFile(file);  setBannerPreview(blobUrl); }
   };
@@ -281,19 +402,20 @@ export default function ProfilePage() {
       {/* TOAST */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+          position: "fixed", bottom: 24, right: 16, left: 16, zIndex: 9999,
           background: toast.ok ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
           border: `1px solid ${toast.ok ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)"}`,
           color: toast.ok ? "#4ade80" : "#f87171",
           padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 600,
           display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)",
+          maxWidth: 400, margin: "0 auto",
         }}>
           {toast.ok ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.msg}
         </div>
       )}
 
-      {/* BANNER — resolved to full backend URL */}
+      {/* BANNER */}
       <img
         className="profile-banner"
         src={imgUrl(profile.banner, FALLBACK_BANNER)}
@@ -303,7 +425,6 @@ export default function ProfilePage() {
       {/* HEADER */}
       <div className="profile-header">
         <div className="profile-avatar-row">
-          {/* AVATAR — resolved to full backend URL */}
           <img
             className="profile-avatar"
             src={imgUrl(profile.avatar, FALLBACK_AVATAR)}
@@ -387,7 +508,7 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {/* CONTENT */}
+      {/* CONTENT — Desktop grid */}
       <div className="profile-content">
         {filteredPosts.length === 0 ? (
           <p style={{ color: "var(--text-muted)", textAlign: "center", marginTop: 40 }}>
@@ -400,7 +521,6 @@ export default function ProfilePage() {
               const liked = likes.includes(me?.id);
               return (
                 <div key={post._id} className="profile-card">
-                  {/* Post thumbnails also need the backend URL */}
                   <img
                     className="profile-card-thumb"
                     src={imgUrl(post.thumbnail, FALLBACK_AVATAR)}
@@ -433,6 +553,15 @@ export default function ProfilePage() {
         )}
       </div>
 
+      {/* CONTENT — Mobile slider (fuera del profile-content para full width) */}
+      <MobileSlider
+        posts={filteredPosts}
+        me={me}
+        isOwner={!!isOwner}
+        onLike={handleLike}
+        onDelete={handleDelete}
+      />
+
       {/* SETTINGS MODAL */}
       {settingsOpen && isOwner && (
         <div className="settings-overlay"
@@ -456,7 +585,7 @@ export default function ProfilePage() {
                   background: activeSettingsTab === sid ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.05)",
                   border: `1px solid ${activeSettingsTab === sid ? "rgba(168,85,247,0.5)" : "rgba(255,255,255,0.1)"}`,
                   color: activeSettingsTab === sid ? "#a855f7" : "rgba(255,255,255,0.6)",
-                  padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                 }}>
                   <Icon size={13} /> {label}
